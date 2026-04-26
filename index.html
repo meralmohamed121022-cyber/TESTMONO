@@ -11,7 +11,6 @@
 <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/meralmohamed121022-cyber/Drug-Monograph/858ba78ce2719a0e7069fd4807b725e0002a17d8/6_20251129_184528_0005.png">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 </head>
 <body>
 <style>
@@ -46508,37 +46507,57 @@ function getWaImageBtnHTML(product) {
   </div>
   `;
 }
-let html5QrcodeScanner = null;
+let html5QrScanner = null; // سميه اسم مختلف شوية للتأكيد
 
-function openBarcodeScanner() {
+async function openBarcodeScanner() {
     document.getElementById('scannerModalOverlay').style.display = 'flex';
     
-    if (!html5QrcodeScanner) {
-        html5QrcodeScanner = new Html5Qrcode("reader");
+    // 1. تنظيف أي جلسة قديمة فوراً عشان ميحصلش تعليق (Crucial Fix)
+    if (html5QrScanner) {
+        try {
+            await html5QrScanner.stop();
+        } catch (e) {
+            // تجاهل لو هي أصلاً واقفة
+        }
     }
 
-    // الإعدادات عشان الصورة متطلعش مقلوبة أو ضيقة
+    // 2. إنشاء كائن جديد في كل مرة
+    html5QrScanner = new Html5Qrcode("reader");
+
     const config = { 
-        fps: 15, 
-        qrbox: { width: 250, height: 150 }, // المربع اللي بيظهر فيه المسح
+        fps: 20, // زودنا الفريمات لسرعة اللقط
+        qrbox: { width: 250, height: 180 },
         aspectRatio: 1.0 
     };
 
-    html5QrcodeScanner.start(
+    // 3. المحاولة بوضع "environment" (الكاميرا الخلفية)
+    html5QrScanner.start(
         { facingMode: "environment" }, 
         config,
         (decodedText) => {
-            // ... نفس كود النجاح اللي بعتهولك فوق ...
-            onScanSuccess(decodedText); // استدعي دالة النجاح
+            onScanSuccess(decodedText); 
         },
-        (error) => { /* تجاهل الأخطاء البسيطة */ }
+        (error) => { /* تجاهل أخطاء البحث */ }
     ).catch(err => {
-        alert("تأكد من فتح الموقع بـ HTTPS والسماح للكاميرا");
+        console.error("Back camera failed, trying any available...", err);
+        // 4. لو الكاميرا الخلفية فشلت (زي في بعض اللاب توبات)، يفتح الكاميرا المتاحة
+        html5QrScanner.start({ facingMode: "user" }, config, (decodedText) => {
+            onScanSuccess(decodedText);
+        }, (error) => {});
     });
 }
-function closeBarcodeScanner() {
+
+async function closeBarcodeScanner() {
     document.getElementById('scannerModalOverlay').style.display = 'none';
-    if (html5QrcodeScanner) html5QrcodeScanner.stop();
+    if (html5QrScanner) {
+        try {
+            await html5QrScanner.stop();
+            // مسح الـ HTML اللي المكتبة بتعمله جوا الـ div عشان ميعلقش المرة الجاية
+            html5QrScanner.clear(); 
+        } catch (e) {
+            console.log("Scanner already stopped");
+        }
+    }
 }
 </script>
 </body>
