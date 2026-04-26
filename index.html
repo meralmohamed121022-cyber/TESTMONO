@@ -46516,11 +46516,7 @@ async function openBarcodeScanner() {
     const readerEl = document.getElementById('reader');
     if (readerEl) {
         readerEl.innerHTML = "";
-        // 1. تصغير ارتفاع منطقة الكاميرا (خليناها مستطيلة عرضية بدل مربعة)
-        readerEl.style.height = "200px"; 
-        readerEl.style.width = "100%";
-        readerEl.style.overflow = "hidden";
-        readerEl.style.aspectRatio = "unset"; // لغينا المربع
+        readerEl.style.height = "250px"; // ارتفاع ثابت ومريح للكاميرا
     }
 
     try {
@@ -46532,14 +46528,12 @@ async function openBarcodeScanner() {
         html5QrScanner = new Html5Qrcode("reader");
 
         const config = { 
-            fps: 30, 
-            // 2. تصغير مربع المسح (البرواز الأبيض) ليناسب الباركود فقط
-            qrbox: { width: 220, height: 120 }, 
-            // 3. تغيير النسبة لتكون عرضية مريحة للعين
-            aspectRatio: 1.77, 
+            fps: 30, // سرعة معالجة عالية
+            qrbox: { width: 220, height: 220 }, // مربع تركيز مناسب
+            aspectRatio: 1.0,
+            // تحديد الأنواع اللي تهمنا فقط لسرعة القراءة
             formatsToSupport: [ 
                 Html5QrcodeSupportedFormats.DATA_MATRIX, 
-                Html5QrcodeSupportedFormats.QR_CODE,
                 Html5QrcodeSupportedFormats.CODE_128 
             ]
         };
@@ -46552,6 +46546,66 @@ async function openBarcodeScanner() {
 
     } catch (err) {
         console.error("Scanner Error:", err);
+    }
+}
+
+function processScannedCode(code) {
+    const cleanCode = String(code).trim();
+    // البحث في الداتا بيز
+    const product = productsDB.find(p => String(p.Code) === cleanCode);
+    
+    if (product) {
+        // --- منطق تشييك العروض (الحل النهائي) ---
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        // بنشوف الكود موجود في الـ Map اللي إنت بنيتها للفترة الحالية ولا لأ
+        const offer = getOffer(cleanCode);
+        
+        // تشييك إضافي: هل إحنا جوه فترة العرض الحالية؟
+        let isOfferActive = false;
+        if (offer && typeof CURRENT_OFFER_START !== 'undefined') {
+            if (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END) {
+                isOfferActive = true;
+            }
+        }
+
+        const nameEN = product["Item Description"] || "No Description";
+        const nameAR = product["أسم المنتج"] || "";
+
+        // تحديث الواجهة بالألوان
+        const statusColor = isOfferActive ? "#38ef7d" : "#ff4d4d";
+        const offerTitle = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض متاح حالياً";
+
+        document.getElementById('latestScannedItem').innerHTML = `
+            <div style="border: 2px solid ${statusColor}; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 12px; margin-bottom: 10px;">
+                <div style="color: ${statusColor}; font-weight: 900; font-size: 16px; text-align: center; margin-bottom: 5px;">${offerTitle}</div>
+                <div style="font-size: 14px; color: white; font-weight: bold;">${nameEN}</div>
+                <div style="font-size: 14px; color: #fbbf24; direction: rtl; font-family: 'Cairo';">${nameAR}</div>
+                <div style="color: #aaa; font-family: monospace; font-size: 11px; margin-top: 5px;">CODE: ${cleanCode}</div>
+            </div>
+        `;
+
+        // إضافة للطباعة "فقط" لو عليه عرض
+        if (isOfferActive) {
+            if (typeof selectedProductCodes !== 'undefined') {
+                selectedProductCodes.add(cleanCode);
+                if (typeof updateSelectedCount === 'function') updateSelectedCount();
+            }
+
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(56, 239, 125, 0.15); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: white; font-size: 12px; border-right: 5px solid #38ef7d; direction: rtl; text-align: right;";
+            row.innerHTML = `✅ <b>${cleanCode}</b> - ${nameAR || nameEN}`;
+            document.getElementById('scannedItemsList').prepend(row);
+        } else {
+            // لو مفيش عرض، بنضيفه في الليستة للتوضيح بس بلون أحمر ومبيتضافش للطباعة
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(255, 77, 77, 0.1); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: #ffbaba; font-size: 12px; border-right: 5px solid #ff4d4d; direction: rtl; text-align: right;";
+            row.innerHTML = `❌ <b>${cleanCode}</b> - بدون عرض (لن يطبع)`;
+            document.getElementById('scannedItemsList').prepend(row);
+        }
+
+        if (navigator.vibrate) navigator.vibrate(100);
     }
 }
 </script>
