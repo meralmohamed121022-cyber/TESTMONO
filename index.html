@@ -46487,8 +46487,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 console.log('✅ Gateway & Data Ready!');
-// 1. خريطة لحفظ الأكواد الممسوحة بكمياتها
-// 1. تعريف المتغيرات باستخدام var لمنع مشاكل التهيئة
+// 1. استخدام var لمنع خطأ الـ Initialization
+// =================================================================
+// 1️⃣ دالة زر الواتساب (بدون أي تعديل)
+// =================================================================
+function getWaImageBtnHTML(product) {
+  const imgUrl = product.itemurl || product.ItemURL;
+  if (imgUrl && imgUrl !== "null" && imgUrl.trim() !== "") {
+    return ""; 
+  }
+  
+  const itemName = product["Item Description"] || "Unknown Item";
+  const itemCode = product.Code || "بدون كود";
+  
+  const msg = encodeURIComponent(`مرحباً يا Mo، أود إرفاق صورة لهذا الصنف:\nالكود: ${itemCode}\nالاسم: ${itemName}`);
+  const waLink = `https://wa.me/966541932559?text=${msg}`;
+  
+  return `
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; width: 85%; text-align: center;">
+    <a href="${waLink}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 5px; background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 800; font-family: 'Cairo', sans-serif; font-size: 12px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); transition: transform 0.2s ease;">
+      📸 أرفق صورة للصنف
+    </a>
+  </div>
+  `;
+}
+
+// =================================================================
+// 2️⃣ متغيرات ودالة تشغيل ماسح الباركود
+// =================================================================
 var html5QrScanner = null; 
 var scannedItemsMap = new Map(); 
 
@@ -46502,13 +46528,11 @@ async function openBarcodeScanner() {
         readerEl.style.height = "250px"; 
     }
 
-    // تصفير الجلسة
     scannedItemsMap.clear();
     document.getElementById('scannedItemsList').innerHTML = "";
     document.getElementById('latestScannedItem').innerHTML = "<div style='color:#94a3b8; text-align:center;'>بانتظار مسح الكود...</div>";
 
     try {
-        // إيقاف أي جلسة سابقة بأمان
         if (html5QrScanner) {
             if (html5QrScanner.isScanning) {
                 try { await html5QrScanner.stop(); } catch(e) {}
@@ -46529,71 +46553,71 @@ async function openBarcodeScanner() {
             ]
         };
 
-        // 🌟 الحل الجذري للشاشة السوداء: البحث عن الكاميرات المتاحة
-        const devices = await Html5Qrcode.getCameras();
-        
-        if (devices && devices.length > 0) {
-            let selectedCameraId = devices[0].id; // الكاميرا الافتراضية
-            
-            // محاولة إيجاد الكاميرا الخلفية لو متاحة
-            for (let i = 0; i < devices.length; i++) {
-                const label = devices[i].label.toLowerCase();
-                if (label.includes("back") || label.includes("rear") || label.includes("environment")) {
-                    selectedCameraId = devices[i].id;
-                    break;
-                }
-            }
-
-            // تشغيل الكاميرا المختارة
+        // الدخول المباشر (تخطي مشكلة المتصفح الخفي والشاشة السوداء)
+        try {
             await html5QrScanner.start(
-                selectedCameraId, 
+                { facingMode: "environment" }, 
                 config,
                 (decodedText) => { processScannedCode(decodedText); }
             );
-        } else {
-            throw new Error("لم يتم العثور على كاميرا في هذا الجهاز.");
+        } catch (envError) {
+            console.warn("Back camera failed, trying front...", envError);
+            await html5QrScanner.start(
+                { facingMode: "user" }, 
+                config,
+                (decodedText) => { processScannedCode(decodedText); }
+            );
         }
 
-    } catch (err) {
-        console.error("Scanner Error:", err);
+    } catch (finalError) {
+        console.error("Scanner Error:", finalError);
         if (readerEl) {
             readerEl.innerHTML = `
                 <div style="color: #ff4d4d; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%;">
                     <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
-                    <div style="font-weight: bold; margin-bottom: 5px;">الكاميرا مقفولة أمنياً!</div>
-                    <div style="font-size: 12px; color: #ccc;">افتح الموقع بـ HTTPS (مثل Vercel) أو اسمح للمتصفح بالوصول للكاميرا.</div>
+                    <div style="font-weight: bold; margin-bottom: 5px;">تعذر فتح الكاميرا!</div>
+                    <div style="font-size: 11px; color: #ccc; word-break: break-word;">${finalError.message || finalError}</div>
                 </div>
             `;
         }
     }
 }
 
+// =================================================================
+// 3️⃣ معالجة الكود الممسوح والبحث عن العروض
+// =================================================================
 function processScannedCode(code) {
     const cleanCode = String(code).trim();
     
-    // 2. منع التكرار وزيادة الكمية بدلاً من ذلك
+    // منع التكرار وزيادة الكمية
     if (scannedItemsMap.has(cleanCode)) {
         const itemData = scannedItemsMap.get(cleanCode);
         if (itemData.isOfferActive) {
-            itemData.qty += 1; // زيادة الكمية
+            itemData.qty += 1;
             updateScannedListUI();
-            if (navigator.vibrate) navigator.vibrate(50); // هزة خفيفة للتأكيد
+            if (navigator.vibrate) navigator.vibrate(50);
         }
         return; 
     }
 
-    // 3. البحث في الداتا بيز
     const product = productsDB.find(p => String(p.Code) === cleanCode);
     
     if (product) {
-        // الاعتماد على getOffer مباشرة للتحقق من العرض النشط
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
         const offer = getOffer(cleanCode);
-        const isOfferActive = offer ? true : false;
+        
+        let isOfferActive = false;
+        if (offer && typeof CURRENT_OFFER_START !== 'undefined') {
+            if (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END) {
+                isOfferActive = true;
+            }
+        }
 
         const nameEN = product["Item Description"] || "No Description";
         const nameAR = product["أسم المنتج"] || "";
 
-        // تحديث الواجهة الرئيسية للكارت تحت الكاميرا
         const statusColor = isOfferActive ? "#38ef7d" : "#ff4d4d";
         const offerTitle = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض متاح حالياً";
 
@@ -46606,7 +46630,6 @@ function processScannedCode(code) {
             </div>
         `;
 
-        // 4. الحفظ في الخريطة للتحكم في الطباعة والكميات
         scannedItemsMap.set(cleanCode, {
             product: product,
             offer: offer,
@@ -46618,11 +46641,13 @@ function processScannedCode(code) {
 
         updateScannedListUI();
 
-        if (navigator.vibrate) navigator.vibrate(150); // هزة قوية للصنف الجديد
+        if (navigator.vibrate) navigator.vibrate(150);
     }
 }
 
-// دالة لتحديث قائمة الأصناف السفلية بأزرار التحكم في الكمية (+ / -)
+// =================================================================
+// 4️⃣ تحديث واجهة قائمة الأصناف
+// =================================================================
 function updateScannedListUI() {
     const listEl = document.getElementById('scannedItemsList');
     if(!listEl) return;
@@ -46653,27 +46678,30 @@ function updateScannedListUI() {
                 <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 4px 10px; font-weight: bold;">حذف</button>
             `;
         }
-        listEl.prepend(row); // الإضافة في الأعلى ليكون أحدث عنصر مرئي
+        listEl.prepend(row);
     });
 }
 
-// دالة لتغيير الكميات (+ / -) من الواجهة
+// =================================================================
+// 5️⃣ تعديل الكميات
+// =================================================================
 function changeScanQty(code, change) {
     if (scannedItemsMap.has(code)) {
         const data = scannedItemsMap.get(code);
         data.qty += change;
         if (data.qty <= 0) {
-            scannedItemsMap.delete(code); // حذفه تماماً لو الكمية صفر
+            scannedItemsMap.delete(code);
         }
         updateScannedListUI();
     }
 }
 
-// 5. دالة الطباعة الخاصة بالسكانر (تطبع الكميات المحددة)
+// =================================================================
+// 6️⃣ دالة الطباعة الخاصة بالسكانر
+// =================================================================
 function printScannedFull() {
     const productsToPrint = [];
     
-    // تكرار الصنف حسب الكمية المطلوبة (qty)
     scannedItemsMap.forEach((data, code) => {
         if (data.isOfferActive) {
             for (let i = 0; i < data.qty; i++) {
@@ -46687,10 +46715,8 @@ function printScannedFull() {
         return;
     }
 
-    // إغلاق السكانر
     closeBarcodeScanner();
 
-    // تشغيل الطباعة بالدالة الأصلية
     const container = document.getElementById("printContainer");
     const loader = document.getElementById("printLoader");
     
@@ -46718,6 +46744,9 @@ function printScannedFull() {
     }, 150);
 }
 
+// =================================================================
+// 7️⃣ إغلاق السكانر
+// =================================================================
 async function closeBarcodeScanner() {
     const overlay = document.getElementById('scannerModalOverlay');
     if (overlay) overlay.style.display = 'none';
@@ -46727,9 +46756,7 @@ async function closeBarcodeScanner() {
             if (html5QrScanner.isScanning) await html5QrScanner.stop();
             html5QrScanner.clear();
             html5QrScanner = null; 
-        } catch (e) {
-            console.log("Scanner cleanup handled");
-        }
+        } catch (e) {}
     }
 }
 </script>
