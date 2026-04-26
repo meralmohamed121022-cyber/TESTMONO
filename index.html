@@ -46488,54 +46488,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 console.log('✅ Gateway & Data Ready!');
 // 1. استخدام var لمنع خطأ الـ Initialization
-// =================================================================
-// 1️⃣ دالة زر الواتساب (بدون أي تعديل)
-// =================================================================
-function getWaImageBtnHTML(product) {
-  const imgUrl = product.itemurl || product.ItemURL;
-  if (imgUrl && imgUrl !== "null" && imgUrl.trim() !== "") {
-    return ""; 
-  }
-  
-  const itemName = product["Item Description"] || "Unknown Item";
-  const itemCode = product.Code || "بدون كود";
-  
-  const msg = encodeURIComponent(`مرحباً يا Mo، أود إرفاق صورة لهذا الصنف:\nالكود: ${itemCode}\nالاسم: ${itemName}`);
-  const waLink = `https://wa.me/966541932559?text=${msg}`;
-  
-  return `
-  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; width: 85%; text-align: center;">
-    <a href="${waLink}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 5px; background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 800; font-family: 'Cairo', sans-serif; font-size: 12px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); transition: transform 0.2s ease;">
-      📸 أرفق صورة للصنف
-    </a>
-  </div>
-  `;
-}
-
-// =================================================================
-// 2️⃣ متغيرات ودالة تشغيل ماسح الباركود
-// =================================================================
 var html5QrScanner = null; 
-var scannedItemsMap = new Map(); 
+// متغيرات لمنع تكرار المسح
+let lastScannedCode = null; 
+let lastScanTime = 0;
 
 async function openBarcodeScanner() {
+    // إظهار المودال فوراً
     const overlay = document.getElementById('scannerModalOverlay');
     if (overlay) overlay.style.display = 'flex';
     
+    // تنظيف الحاوية
     const readerEl = document.getElementById('reader');
-    if (readerEl) {
-        readerEl.innerHTML = "<div style='color:white; padding:50px 0; text-align:center;'>جاري تشغيل الكاميرا...</div>";
-        readerEl.style.height = "250px"; 
-    }
-
-    scannedItemsMap.clear();
-    document.getElementById('scannedItemsList').innerHTML = "";
-    document.getElementById('latestScannedItem').innerHTML = "<div style='color:#94a3b8; text-align:center;'>بانتظار مسح الكود...</div>";
+    if (readerEl) readerEl.innerHTML = "";
 
     try {
         if (html5QrScanner) {
             if (html5QrScanner.isScanning) {
-                try { await html5QrScanner.stop(); } catch(e) {}
+                await html5QrScanner.stop();
             }
             html5QrScanner.clear();
         }
@@ -46543,220 +46513,117 @@ async function openBarcodeScanner() {
         html5QrScanner = new Html5Qrcode("reader");
 
         const config = { 
-            fps: 30, 
-            qrbox: { width: 220, height: 220 }, 
+            fps: 25, 
+            qrbox: { width: 250, height: 250 }, 
             aspectRatio: 1.0,
             formatsToSupport: [ 
                 Html5QrcodeSupportedFormats.DATA_MATRIX, 
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.QR_CODE
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128 
             ]
         };
 
-        // الدخول المباشر (تخطي مشكلة المتصفح الخفي والشاشة السوداء)
-        try {
-            await html5QrScanner.start(
-                { facingMode: "environment" }, 
-                config,
-                (decodedText) => { processScannedCode(decodedText); }
-            );
-        } catch (envError) {
-            console.warn("Back camera failed, trying front...", envError);
-            await html5QrScanner.start(
-                { facingMode: "user" }, 
-                config,
-                (decodedText) => { processScannedCode(decodedText); }
-            );
-        }
+        // تصفير المتغيرات عند فتح الكاميرا من جديد
+        lastScannedCode = null;
+        lastScanTime = 0;
 
-    } catch (finalError) {
-        console.error("Scanner Error:", finalError);
-        if (readerEl) {
-            readerEl.innerHTML = `
-                <div style="color: #ff4d4d; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%;">
-                    <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
-                    <div style="font-weight: bold; margin-bottom: 5px;">تعذر فتح الكاميرا!</div>
-                    <div style="font-size: 11px; color: #ccc; word-break: break-word;">${finalError.message || finalError}</div>
-                </div>
-            `;
+        await html5QrScanner.start(
+            { facingMode: "environment" }, 
+            config,
+            (decodedText) => {
+                processScannedCode(decodedText);
+            },
+            (error) => { /* تجاهل أخطاء البحث */ }
+        );
+
+    } catch (err) {
+        console.error("Scanner Error:", err);
+        if (html5QrScanner) {
+            html5QrScanner.start(
+                { facingMode: "user" }, 
+                { fps: 25, qrbox: 250 }, 
+                (txt) => processScannedCode(txt), 
+                (e) => {}
+            );
         }
     }
 }
 
-// =================================================================
-// 3️⃣ معالجة الكود الممسوح والبحث عن العروض
-// =================================================================
 function processScannedCode(code) {
     const cleanCode = String(code).trim();
+    const currentTime = new Date().getTime();
     
-    // منع التكرار وزيادة الكمية
-    if (scannedItemsMap.has(cleanCode)) {
-        const itemData = scannedItemsMap.get(cleanCode);
-        if (itemData.isOfferActive) {
-            itemData.qty += 1;
-            updateScannedListUI();
-            if (navigator.vibrate) navigator.vibrate(50);
-        }
-        return; 
+    // 1. منع التكرار: إذا كان الكود هو نفسه وتم مسحه في آخر 3 ثواني، تجاهله
+    if (cleanCode === lastScannedCode && (currentTime - lastScanTime) < 3000) {
+        return;
     }
-
+    
+    // تحديث وقت المسح والكود
+    lastScannedCode = cleanCode;
+    lastScanTime = currentTime;
+    
+    // البحث في الداتا بيز
     const product = productsDB.find(p => String(p.Code) === cleanCode);
     
     if (product) {
         const now = new Date();
-        now.setHours(0, 0, 0, 0);
+        now.setHours(0,0,0,0);
 
-        const offer = getOffer(cleanCode);
-        
+        // 2. التحقق من وجود دالة العرض والتواريخ لتفادي أخطاء إيقاف الصفحة
         let isOfferActive = false;
-        if (offer && typeof CURRENT_OFFER_START !== 'undefined') {
-            if (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END) {
-                isOfferActive = true;
+        let offer = null;
+        
+        try {
+            offer = typeof getOffer === 'function' ? getOffer(cleanCode) : null;
+            if (offer && typeof CURRENT_OFFER_START !== 'undefined' && typeof CURRENT_OFFER_END !== 'undefined') {
+                isOfferActive = (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END);
             }
+        } catch(e) {
+            console.error("Error checking offer:", e);
         }
 
-        const nameEN = product["Item Description"] || "No Description";
-        const nameAR = product["أسم المنتج"] || "";
+        // جلب الأسماء بشكل آمن وتغطية احتمالات مسميات الأعمدة المختلفة
+        const nameEN = product["Item Description"] || product.itemdescription || "English Name Not Found";
+        const nameAR = product["أسم المنتج"] || product["Item Description AR"] || product.nameAr || "";
 
-        const statusColor = isOfferActive ? "#38ef7d" : "#ff4d4d";
-        const offerTitle = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض متاح حالياً";
+        // تحديث كارت البيانات تحت الكاميرا
+        const statusColor = isOfferActive ? "#38ef7d" : "#ef4444";
+        const offerLabel = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض نشط حالياً";
 
         document.getElementById('latestScannedItem').innerHTML = `
-            <div style="border: 2px solid ${statusColor}; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 12px; margin-bottom: 10px;">
-                <div style="color: ${statusColor}; font-weight: 900; font-size: 16px; text-align: center; margin-bottom: 5px;">${offerTitle}</div>
-                <div style="font-size: 14px; color: white; font-weight: bold;">${nameEN}</div>
-                <div style="font-size: 14px; color: #fbbf24; direction: rtl; font-family: 'Cairo';">${nameAR}</div>
-                <div style="color: #aaa; font-family: monospace; font-size: 11px; margin-top: 5px;">CODE: ${cleanCode}</div>
-            </div>
+            <div style="color: ${statusColor}; font-weight: bold; font-size: 14px; margin-bottom: 5px;">${offerLabel}</div>
+            <div style="font-size: 14px; color: white; font-weight: 600;">${nameEN}</div>
+            <div style="font-size: 14px; color: #fbbf24; font-family: 'Cairo', sans-serif; direction: rtl; margin: 3px 0;">${nameAR}</div>
+            <div style="color: #94a3b8; font-family: monospace; font-size: 12px;">CODE: ${cleanCode}</div>
         `;
 
-        scannedItemsMap.set(cleanCode, {
-            product: product,
-            offer: offer,
-            isOfferActive: isOfferActive,
-            nameEN: nameEN,
-            nameAR: nameAR,
-            qty: 1
-        });
-
-        updateScannedListUI();
-
-        if (navigator.vibrate) navigator.vibrate(150);
-    }
-}
-
-// =================================================================
-// 4️⃣ تحديث واجهة قائمة الأصناف
-// =================================================================
-function updateScannedListUI() {
-    const listEl = document.getElementById('scannedItemsList');
-    if(!listEl) return;
-    listEl.innerHTML = ""; 
-
-    scannedItemsMap.forEach((data, code) => {
-        const row = document.createElement('div');
-        
-        if (data.isOfferActive) {
-            row.style.cssText = "background: rgba(56, 239, 125, 0.15); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: white; font-size: 12px; border-right: 5px solid #38ef7d; direction: rtl; display: flex; justify-content: space-between; align-items: center;";
-            row.innerHTML = `
-                <div style="flex: 1; text-align: right;">
-                    <div style="font-weight: bold; color: #38ef7d;">✅ ${code}</div>
-                    <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">${data.nameAR || data.nameEN.substring(0,25)}</div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 6px;" dir="ltr">
-                    <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">-</button>
-                    <span style="font-size: 14px; font-weight: bold; min-width: 15px; text-align: center;">${data.qty}</span>
-                    <button onclick="changeScanQty('${code}', 1)" style="background: #3b82f6; color: white; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">+</button>
-                </div>
-            `;
-        } else {
-            row.style.cssText = "background: rgba(255, 77, 77, 0.1); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: #ffbaba; font-size: 12px; border-right: 5px solid #ff4d4d; direction: rtl; text-align: right; display: flex; justify-content: space-between; align-items: center;";
-            row.innerHTML = `
-                <div>
-                    ❌ <b>${code}</b> - بدون عرض (لن يُطبع)
-                </div>
-                <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 4px 10px; font-weight: bold;">حذف</button>
-            `;
-        }
-        listEl.prepend(row);
-    });
-}
-
-// =================================================================
-// 5️⃣ تعديل الكميات
-// =================================================================
-function changeScanQty(code, change) {
-    if (scannedItemsMap.has(code)) {
-        const data = scannedItemsMap.get(code);
-        data.qty += change;
-        if (data.qty <= 0) {
-            scannedItemsMap.delete(code);
-        }
-        updateScannedListUI();
-    }
-}
-
-// =================================================================
-// 6️⃣ دالة الطباعة الخاصة بالسكانر
-// =================================================================
-function printScannedFull() {
-    const productsToPrint = [];
-    
-    scannedItemsMap.forEach((data, code) => {
-        if (data.isOfferActive) {
-            for (let i = 0; i < data.qty; i++) {
-                productsToPrint.push(data.product);
+        // 6. الإضافة للستة 
+        if (isOfferActive) {
+            // التحقق من وجود المتغيرات لتجنب الأخطاء
+            if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes) {
+                selectedProductCodes.add(cleanCode);
+                if (typeof updateSelectedCount === 'function') updateSelectedCount();
             }
-        }
-    });
 
-    if (productsToPrint.length === 0) {
-        alert("⚠️ لا توجد أصناف عليها عروض صالحة للطباعة!");
-        return;
-    }
-
-    closeBarcodeScanner();
-
-    const container = document.getElementById("printContainer");
-    const loader = document.getElementById("printLoader");
-    
-    if (container) container.innerHTML = ""; 
-    if (loader) loader.style.display = "flex";
-
-    setTimeout(() => {
-        if (typeof renderPrint === 'function') {
-            renderPrint(productsToPrint); 
-            
-            const qrImages = container.querySelectorAll('.qr-code-img');
-            if (typeof waitForImagesToLoad === 'function') {
-                waitForImagesToLoad(qrImages).then(() => {
-                    if (loader) loader.style.display = "none";
-                    setTimeout(() => window.print(), 50);
-                });
-            } else {
-                if (loader) loader.style.display = "none";
-                setTimeout(() => window.print(), 1000);
-            }
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(56, 239, 125, 0.1); padding: 10px; margin-bottom: 8px; border-radius: 8px; color: white; font-size: 12px; border-right: 4px solid #38ef7d; direction: rtl; text-align: right;";
+            row.innerHTML = `
+                <div style="font-weight: bold;">✅ ${cleanCode}</div>
+                <div style="font-size: 11px; opacity: 0.9;">${nameAR}</div>
+                <div style="font-size: 10px; color: #38ef7d;">${nameEN.substring(0, 25)}...</div>
+            `;
+            document.getElementById('scannedItemsList').prepend(row);
         } else {
-            alert("⚠️ دالة renderPrint غير موجودة!");
-            if (loader) loader.style.display = "none";
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(239, 68, 68, 0.1); padding: 10px; margin-bottom: 8px; border-radius: 8px; color: #ff9999; font-size: 12px; border-right: 4px solid #ef4444; direction: rtl; text-align: right;";
+            row.innerHTML = `
+                <div style="font-weight: bold;">⚠️ ${cleanCode} (بدون عرض)</div>
+                <div style="font-size: 11px; opacity: 0.9;">${nameAR}</div>
+            `;
+            document.getElementById('scannedItemsList').prepend(row);
         }
-    }, 150);
-}
 
-// =================================================================
-// 7️⃣ إغلاق السكانر
-// =================================================================
-async function closeBarcodeScanner() {
-    const overlay = document.getElementById('scannerModalOverlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    if (html5QrScanner) {
-        try {
-            if (html5QrScanner.isScanning) await html5QrScanner.stop();
-            html5QrScanner.clear();
-            html5QrScanner = null; 
-        } catch (e) {}
+        if (navigator.vibrate) navigator.vibrate(100);
     }
 }
 </script>
