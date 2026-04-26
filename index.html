@@ -46488,6 +46488,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 console.log('✅ Gateway & Data Ready!');
 // 1. خريطة لحفظ الأكواد الممسوحة بكمياتها
+// 1. تعريف المتغيرات باستخدام var لمنع مشاكل التهيئة
 var html5QrScanner = null; 
 var scannedItemsMap = new Map(); 
 
@@ -46497,18 +46498,21 @@ async function openBarcodeScanner() {
     
     const readerEl = document.getElementById('reader');
     if (readerEl) {
-        readerEl.innerHTML = "";
+        readerEl.innerHTML = "<div style='color:white; padding:50px 0; text-align:center;'>جاري تشغيل الكاميرا...</div>";
         readerEl.style.height = "250px"; 
     }
 
-    // تصفير الجلسة القديمة
+    // تصفير الجلسة
     scannedItemsMap.clear();
     document.getElementById('scannedItemsList').innerHTML = "";
     document.getElementById('latestScannedItem').innerHTML = "<div style='color:#94a3b8; text-align:center;'>بانتظار مسح الكود...</div>";
 
     try {
+        // إيقاف أي جلسة سابقة بأمان
         if (html5QrScanner) {
-            if (html5QrScanner.isScanning) await html5QrScanner.stop();
+            if (html5QrScanner.isScanning) {
+                try { await html5QrScanner.stop(); } catch(e) {}
+            }
             html5QrScanner.clear();
         }
 
@@ -46520,18 +46524,47 @@ async function openBarcodeScanner() {
             aspectRatio: 1.0,
             formatsToSupport: [ 
                 Html5QrcodeSupportedFormats.DATA_MATRIX, 
-                Html5QrcodeSupportedFormats.CODE_128 
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.QR_CODE
             ]
         };
 
-        await html5QrScanner.start(
-            { facingMode: "environment" }, 
-            config,
-            (decodedText) => { processScannedCode(decodedText); }
-        );
+        // 🌟 الحل الجذري للشاشة السوداء: البحث عن الكاميرات المتاحة
+        const devices = await Html5Qrcode.getCameras();
+        
+        if (devices && devices.length > 0) {
+            let selectedCameraId = devices[0].id; // الكاميرا الافتراضية
+            
+            // محاولة إيجاد الكاميرا الخلفية لو متاحة
+            for (let i = 0; i < devices.length; i++) {
+                const label = devices[i].label.toLowerCase();
+                if (label.includes("back") || label.includes("rear") || label.includes("environment")) {
+                    selectedCameraId = devices[i].id;
+                    break;
+                }
+            }
+
+            // تشغيل الكاميرا المختارة
+            await html5QrScanner.start(
+                selectedCameraId, 
+                config,
+                (decodedText) => { processScannedCode(decodedText); }
+            );
+        } else {
+            throw new Error("لم يتم العثور على كاميرا في هذا الجهاز.");
+        }
 
     } catch (err) {
         console.error("Scanner Error:", err);
+        if (readerEl) {
+            readerEl.innerHTML = `
+                <div style="color: #ff4d4d; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                    <div style="font-weight: bold; margin-bottom: 5px;">الكاميرا مقفولة أمنياً!</div>
+                    <div style="font-size: 12px; color: #ccc;">افتح الموقع بـ HTTPS (مثل Vercel) أو اسمح للمتصفح بالوصول للكاميرا.</div>
+                </div>
+            `;
+        }
     }
 }
 
@@ -46544,7 +46577,7 @@ function processScannedCode(code) {
         if (itemData.isOfferActive) {
             itemData.qty += 1; // زيادة الكمية
             updateScannedListUI();
-            if (navigator.vibrate) navigator.vibrate(50); // هزة خفيفة
+            if (navigator.vibrate) navigator.vibrate(50); // هزة خفيفة للتأكيد
         }
         return; 
     }
@@ -46553,14 +46586,14 @@ function processScannedCode(code) {
     const product = productsDB.find(p => String(p.Code) === cleanCode);
     
     if (product) {
-        // الاعتماد على getOffer مباشرة (حل جذري لمشكلة العروض)
+        // الاعتماد على getOffer مباشرة للتحقق من العرض النشط
         const offer = getOffer(cleanCode);
         const isOfferActive = offer ? true : false;
 
         const nameEN = product["Item Description"] || "No Description";
         const nameAR = product["أسم المنتج"] || "";
 
-        // تحديث الواجهة الرئيسية للكارت
+        // تحديث الواجهة الرئيسية للكارت تحت الكاميرا
         const statusColor = isOfferActive ? "#38ef7d" : "#ff4d4d";
         const offerTitle = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض متاح حالياً";
 
@@ -46592,6 +46625,7 @@ function processScannedCode(code) {
 // دالة لتحديث قائمة الأصناف السفلية بأزرار التحكم في الكمية (+ / -)
 function updateScannedListUI() {
     const listEl = document.getElementById('scannedItemsList');
+    if(!listEl) return;
     listEl.innerHTML = ""; 
 
     scannedItemsMap.forEach((data, code) => {
@@ -46602,22 +46636,24 @@ function updateScannedListUI() {
             row.innerHTML = `
                 <div style="flex: 1; text-align: right;">
                     <div style="font-weight: bold; color: #38ef7d;">✅ ${code}</div>
-                    <div style="font-size: 11px; opacity: 0.9;">${data.nameAR || data.nameEN.substring(0,25)}</div>
+                    <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">${data.nameAR || data.nameEN.substring(0,25)}</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 6px;" dir="ltr">
-                    <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-weight: bold;">-</button>
+                    <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">-</button>
                     <span style="font-size: 14px; font-weight: bold; min-width: 15px; text-align: center;">${data.qty}</span>
-                    <button onclick="changeScanQty('${code}', 1)" style="background: #3b82f6; color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-weight: bold;">+</button>
+                    <button onclick="changeScanQty('${code}', 1)" style="background: #3b82f6; color: white; border: none; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">+</button>
                 </div>
             `;
         } else {
-            row.style.cssText = "background: rgba(255, 77, 77, 0.1); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: #ffbaba; font-size: 12px; border-right: 5px solid #ff4d4d; direction: rtl; text-align: right;";
+            row.style.cssText = "background: rgba(255, 77, 77, 0.1); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: #ffbaba; font-size: 12px; border-right: 5px solid #ff4d4d; direction: rtl; text-align: right; display: flex; justify-content: space-between; align-items: center;";
             row.innerHTML = `
-                ❌ <b>${code}</b> - بدون عرض (لن يطبع)
-                <button onclick="changeScanQty('${code}', -1)" style="float: left; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 2px 8px;">حذف</button>
+                <div>
+                    ❌ <b>${code}</b> - بدون عرض (لن يُطبع)
+                </div>
+                <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 4px 10px; font-weight: bold;">حذف</button>
             `;
         }
-        listEl.prepend(row);
+        listEl.prepend(row); // الإضافة في الأعلى ليكون أحدث عنصر مرئي
     });
 }
 
@@ -46627,7 +46663,7 @@ function changeScanQty(code, change) {
         const data = scannedItemsMap.get(code);
         data.qty += change;
         if (data.qty <= 0) {
-            scannedItemsMap.delete(code); // حذفه لو الكمية صفر
+            scannedItemsMap.delete(code); // حذفه تماماً لو الكمية صفر
         }
         updateScannedListUI();
     }
@@ -46654,21 +46690,32 @@ function printScannedFull() {
     // إغلاق السكانر
     closeBarcodeScanner();
 
-    // تشغيل الطباعة بالدالة الأصلية الخاصة بك
+    // تشغيل الطباعة بالدالة الأصلية
     const container = document.getElementById("printContainer");
     const loader = document.getElementById("printLoader");
-    container.innerHTML = ""; 
+    
+    if (container) container.innerHTML = ""; 
     if (loader) loader.style.display = "flex";
 
     setTimeout(() => {
-        renderPrint(productsToPrint); // الدالة بتاعتك اللي بترسم الكروت
-        
-        const qrImages = container.querySelectorAll('.qr-code-img');
-        waitForImagesToLoad(qrImages).then(() => {
-            if(loader) loader.style.display = "none";
-            setTimeout(() => window.print(), 50);
-        });
-    }, 100);
+        if (typeof renderPrint === 'function') {
+            renderPrint(productsToPrint); 
+            
+            const qrImages = container.querySelectorAll('.qr-code-img');
+            if (typeof waitForImagesToLoad === 'function') {
+                waitForImagesToLoad(qrImages).then(() => {
+                    if (loader) loader.style.display = "none";
+                    setTimeout(() => window.print(), 50);
+                });
+            } else {
+                if (loader) loader.style.display = "none";
+                setTimeout(() => window.print(), 1000);
+            }
+        } else {
+            alert("⚠️ دالة renderPrint غير موجودة!");
+            if (loader) loader.style.display = "none";
+        }
+    }, 150);
 }
 
 async function closeBarcodeScanner() {
@@ -46680,7 +46727,9 @@ async function closeBarcodeScanner() {
             if (html5QrScanner.isScanning) await html5QrScanner.stop();
             html5QrScanner.clear();
             html5QrScanner = null; 
-        } catch (e) {}
+        } catch (e) {
+            console.log("Scanner cleanup handled");
+        }
     }
 }
 </script>
