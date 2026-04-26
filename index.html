@@ -4395,19 +4395,39 @@ body > div:has(> label[for="codesFileInput"]),
 
 <div id="scannerModalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100000; flex-direction: column; align-items: center; padding-top: 20px;">
     <div style="width: 90%; max-width: 450px; background: #1e293b; border-radius: 20px; overflow: hidden; border: 2px solid #667eea; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 90vh;">
+        
         <button onclick="closeBarcodeScanner()" style="position: absolute; right: 10px; top: 10px; z-index: 1001; background: #ef4444; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center;">X</button>
+        
         <div id="reader" style="width: 100%; background: #000; border-bottom: 2px solid #667eea; min-height: 250px;"></div>
-        <div id="latestScannedItem" style="padding: 15px; background: #0f172a; color: white; text-align: right; min-height: 80px;">
+        
+        <div id="latestScannedItem" style="padding: 10px; background: #0f172a; color: white; text-align: right; min-height: 68px;">
             <div style="color: #94a3b8; font-size: 13px; text-align: center;">بانتظار مسح الكود</div>
         </div>
-        <div style="flex: 1; overflow-y: auto; background: #1e293b; padding: 10px; border-top: 1px solid #334155;">
-            <div id="scannedItemsList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        
+        <div style="flex: 1; overflow-y: auto; background: #1e293b; padding: 8px; border-top: 1px solid #334155;">
+            <div id="scannedItemsList" style="display: flex; flex-direction: column; gap: 6px;"></div>
         </div>
-        <div style="padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #0f172a; border-top: 1px solid #334155;">
-            <button onclick="closeBarcodeScanner(); openCustomPrintModal();" style="padding: 12px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
+        
+        <div style="padding: 12px 15px; display: flex; flex-direction: column; gap: 10px; background: #0f172a; border-top: 1px solid #334155;">
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px;">
+                <label for="scannerQuantityPerCode" style="color: #fff; font-size: 13px; font-weight: bold; direction: rtl;">
+                    عدد الكروت لكل كود
+                </label>
+                <input
+                    id="scannerQuantityPerCode"
+                    type="number"
+                    value="1"
+                    min="1"
+                    style="width: 70px; padding: 8px; background: #111827; border: 1px solid #475569; color: #fff; border-radius: 8px; text-align: center; font-weight: bold;"
+                />
+            </div>
+
+            <button onclick="printScannedCustom()" style="padding: 12px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
                 طباعة عرض مخصص
             </button>
-            <button onclick="printScannedFull();" style="padding: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
+
+            <button onclick="printScannedFullQR()" style="padding: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
                 طباعة الأصناف الممسوحة
             </button>
         </div>
@@ -46505,33 +46525,48 @@ function getWaImageBtnHTML(product) {
   </div>
   `;
 }
+// =====================================================================
+// BARCODE SCANNER - SAFE UPDATED VERSION
+// =====================================================================
 
-// 1. استخدام var لمنع خطأ الـ Initialization
-var html5QrScanner = null; 
+// 1) var لمنع خطأ الـ Initialization
+var html5QrScanner = null;
+
+// سلة خاصة بالأكواد الممسوحة داخل السكانر لمنع التكرار
+var scannedCodesSet = new Set();
+
+// افتراضي عدد الكروت لكل كود من السكانر
+var scannerCardsPerCode = 1;
 
 async function openBarcodeScanner() {
-    // إظهار المودال فوراً
     const overlay = document.getElementById('scannerModalOverlay');
     if (overlay) overlay.style.display = 'flex';
-    
-    // 🌟 مسح سلة الطباعة القديمة عشان نطبع الأصناف الممسوحة "حالياً" فقط
+
+    // تنظيف سلة الطباعة الحالية ليتم الطباعة للمسح الحالي فقط
     if (typeof selectedProductCodes !== 'undefined') {
         selectedProductCodes.clear();
         if (typeof updateSelectedCount === 'function') updateSelectedCount();
     }
 
-    // تنظيف القوائم في الواجهة
+    // تنظيف التكرارات للمسحة الجديدة
+    scannedCodesSet.clear();
+
     const listEl = document.getElementById('scannedItemsList');
     if (listEl) listEl.innerHTML = "";
-    const latestEl = document.getElementById('latestScannedItem');
-    if (latestEl) latestEl.innerHTML = `<div style="color: #94a3b8; font-size: 13px; text-align: center; margin-top: 20px;">بانتظار مسح الكود...</div>`;
 
-    // تنظيف الحاوية
+    const latestEl = document.getElementById('latestScannedItem');
+    if (latestEl) {
+        latestEl.innerHTML = `
+            <div style="color:#94a3b8;font-size:13px;text-align:center;margin-top:8px;">
+                بانتظار مسح الكود...
+            </div>
+        `;
+    }
+
     const readerEl = document.getElementById('reader');
     if (readerEl) readerEl.innerHTML = "";
 
     try {
-        // 2. تنظيف النسخ القديمة
         if (html5QrScanner) {
             if (html5QrScanner.isScanning) {
                 await html5QrScanner.stop();
@@ -46539,108 +46574,178 @@ async function openBarcodeScanner() {
             html5QrScanner.clear();
         }
 
-        // 3. إنشاء نسخة جديدة مع دعم الأكواد السداسية (Data Matrix)
         html5QrScanner = new Html5Qrcode("reader");
 
-        const config = { 
-            fps: 25, 
-            qrbox: { width: 250, height: 250 }, 
+        const config = {
+            fps: 25,
+            qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0,
-            formatsToSupport: [ 
-                Html5QrcodeSupportedFormats.DATA_MATRIX, 
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
                 Html5QrcodeSupportedFormats.QR_CODE,
-                Html5QrcodeSupportedFormats.CODE_128 
+                Html5QrcodeSupportedFormats.CODE_128
             ]
         };
 
-        // 4. تشغيل الكاميرا
         await html5QrScanner.start(
-            { facingMode: "environment" }, 
+            { facingMode: "environment" },
             config,
             (decodedText) => {
                 processScannedCode(decodedText);
             },
-            (error) => { /* تجاهل أخطاء البحث */ }
+            () => {}
         );
 
     } catch (err) {
         console.error("Scanner Error:", err);
-        if (html5QrScanner) {
-            html5QrScanner.start({ facingMode: "user" }, { fps: 25, qrbox: 250 }, (txt) => processScannedCode(txt), (e) => {});
+        try {
+            if (html5QrScanner) {
+                await html5QrScanner.start(
+                    { facingMode: "user" },
+                    {
+                        fps: 25,
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0
+                    },
+                    (txt) => processScannedCode(txt),
+                    () => {}
+                );
+            }
+        } catch (fallbackErr) {
+            console.error("Fallback Scanner Error:", fallbackErr);
         }
     }
 }
 
-// 5. دالة معالجة الكود الممسوح والبحث في الداتا بيز
 function processScannedCode(code) {
     const cleanCode = String(code).trim();
-    
-    // البحث في الداتا بيز الخاصة بك
-    const product = productsDB.find(p => String(p.Code) === cleanCode);
-    
-    if (product) {
-        const now = new Date();
-        now.setHours(0,0,0,0);
+    if (!cleanCode) return;
 
-        const offer = getOffer(cleanCode);
-        const isOfferActive = offer && (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END);
+    const latestEl = document.getElementById('latestScannedItem');
+    const listEl = document.getElementById('scannedItemsList');
 
-        // جلب الأسماء
-        const nameEN = product["Item Description"] || "English Name Not Found";
-        const nameAR = product["أسم المنتج"] || product["Item Description AR"] || "";
-
-        // تحديث كارت البيانات تحت الكاميرا (عرض لغتين)
-        const statusColor = isOfferActive ? "#38ef7d" : "#ef4444";
-        const offerLabel = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض نشط حالياً";
-
-        document.getElementById('latestScannedItem').innerHTML = `
-            <div style="color: ${statusColor}; font-weight: bold; font-size: 14px; margin-bottom: 5px;">${offerLabel}</div>
-            <div style="font-size: 14px; color: white; font-weight: 600;">${nameEN}</div>
-            <div style="font-size: 14px; color: #fbbf24; font-family: 'Cairo', sans-serif; direction: rtl; margin: 3px 0;">${nameAR}</div>
-            <div style="color: #94a3b8; font-family: monospace; font-size: 12px;">CODE: ${cleanCode}</div>
-        `;
-
-        // 6. الإضافة للستة والطباعة
-        if (isOfferActive) {
-            // إضافة الكود عشان دوال الطباعة بتاعتك تقرأه
-            if (typeof selectedProductCodes !== 'undefined') {
-                selectedProductCodes.add(cleanCode);
-                if (typeof updateSelectedCount === 'function') updateSelectedCount();
-            }
-
-            const row = document.createElement('div');
-            row.style.cssText = "background: rgba(56, 239, 125, 0.1); padding: 10px; margin-bottom: 8px; border-radius: 8px; color: white; font-size: 12px; border-right: 4px solid #38ef7d; direction: rtl; text-align: right;";
-            row.innerHTML = `
-                <div style="font-weight: bold;">✅ ${cleanCode}</div>
-                <div style="font-size: 11px; opacity: 0.9;">${nameAR}</div>
-                <div style="font-size: 10px; color: #38ef7d;">${nameEN.substring(0, 25)}...</div>
+    // منع إضافة نفس الكود أكثر من مرة
+    if (scannedCodesSet.has(cleanCode)) {
+        if (latestEl) {
+            latestEl.innerHTML = `
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <div style="width:64px;height:64px;border-radius:10px;background:#0f172a;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;flex-shrink:0;border:1px solid #334155;">
+                        مكرر
+                    </div>
+                    <div style="flex:1;text-align:right;">
+                        <div style="color:#f59e0b;font-weight:bold;font-size:13px;margin-bottom:4px;">⚠️ تم مسح هذا الكود من قبل</div>
+                        <div style="color:#e2e8f0;font-family:monospace;font-size:12px;">CODE: ${cleanCode}</div>
+                    </div>
+                </div>
             `;
-            document.getElementById('scannedItemsList').prepend(row);
-        } else {
-            const row = document.createElement('div');
-            row.style.cssText = "background: rgba(239, 68, 68, 0.1); padding: 10px; margin-bottom: 8px; border-radius: 8px; color: #ff9999; font-size: 12px; border-right: 4px solid #ef4444; direction: rtl; text-align: right;";
-            row.innerHTML = `
-                <div style="font-weight: bold;">⚠️ ${cleanCode} (بدون عرض)</div>
-                <div style="font-size: 11px; opacity: 0.9;">${nameAR}</div>
-            `;
-            document.getElementById('scannedItemsList').prepend(row);
         }
 
-        if (navigator.vibrate) navigator.vibrate(100);
+        if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
+        return;
     }
+
+    const product = productsDB.find(p => String(p.Code).trim() === cleanCode);
+
+    if (!product) {
+        if (latestEl) {
+            latestEl.innerHTML = `
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <div style="width:64px;height:64px;border-radius:10px;background:#0f172a;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;flex-shrink:0;border:1px solid #334155;">
+                        لا يوجد
+                    </div>
+                    <div style="flex:1;text-align:right;">
+                        <div style="color:#ef4444;font-weight:bold;font-size:13px;margin-bottom:4px;">❌ المنتج غير موجود في قاعدة البيانات</div>
+                        <div style="color:#e2e8f0;font-family:monospace;font-size:12px;">CODE: ${cleanCode}</div>
+                    </div>
+                </div>
+            `;
+        }
+        if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
+        return;
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const offer = getOffer(cleanCode);
+    const isOfferActive = !!(offer && now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END);
+
+    const nameEN = product["Item Description"] || "English Name Not Found";
+    const nameAR = product["أسم المنتج"] || product["Item Description AR"] || "";
+    const imageUrl = (product.itemurl || product.ItemURL || "").trim();
+
+    const statusColor = isOfferActive ? "#38ef7d" : "#ef4444";
+    const offerLabel = isOfferActive
+        ? (offer.offerTypeAR || offer.offerType || "Offer Active")
+        : "❌ لا يوجد عرض نشط حالياً";
+
+    if (latestEl) {
+        latestEl.innerHTML = `
+            <div style="display:flex;gap:10px;align-items:center;">
+                <div style="width:64px;height:64px;border-radius:10px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid #334155;">
+                    ${
+                        imageUrl && imageUrl.startsWith('http')
+                            ? `<img src="${imageUrl}" alt="${nameEN}"
+                                   style="width:100%;height:100%;object-fit:contain;"
+                                   onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=&quot;color:#94a3b8;font-size:11px;text-align:center;&quot;>No Image</div>';">`
+                            : `<div style="color:#94a3b8;font-size:11px;text-align:center;">No Image</div>`
+                    }
+                </div>
+
+                <div style="flex:1;text-align:right;min-width:0;">
+                    <div style="color:${statusColor};font-weight:bold;font-size:13px;margin-bottom:4px;">${offerLabel}</div>
+                    <div style="font-size:13px;color:white;font-weight:600;line-height:1.4;">${nameEN}</div>
+                    <div style="font-size:13px;color:#fbbf24;font-family:'Cairo',sans-serif;direction:rtl;margin:2px 0;line-height:1.4;">${nameAR}</div>
+                    <div style="color:#94a3b8;font-family:monospace;font-size:11px;">CODE: ${cleanCode}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    scannedCodesSet.add(cleanCode);
+
+    if (isOfferActive) {
+        if (typeof selectedProductCodes !== 'undefined') {
+            selectedProductCodes.add(cleanCode);
+            if (typeof updateSelectedCount === 'function') updateSelectedCount();
+        }
+
+        if (listEl) {
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(56,239,125,0.1); padding: 8px; margin-bottom: 6px; border-radius: 8px; color: white; font-size: 12px; border-right: 4px solid #38ef7d; direction: rtl; text-align: right;";
+            row.innerHTML = `
+                <div style="font-weight:bold;">✅ ${cleanCode}</div>
+                <div style="font-size:11px;opacity:0.9;">${nameAR}</div>
+                <div style="font-size:10px;color:#38ef7d;">${nameEN.substring(0, 30)}</div>
+            `;
+            listEl.prepend(row);
+        }
+    } else {
+        if (listEl) {
+            const row = document.createElement('div');
+            row.style.cssText = "background: rgba(239,68,68,0.1); padding: 8px; margin-bottom: 6px; border-radius: 8px; color: #ff9999; font-size: 12px; border-right: 4px solid #ef4444; direction: rtl; text-align: right;";
+            row.innerHTML = `
+                <div style="font-weight:bold;">⚠️ ${cleanCode} (بدون عرض)</div>
+                <div style="font-size:11px;opacity:0.9;">${nameAR}</div>
+            `;
+            listEl.prepend(row);
+        }
+    }
+
+    if (navigator.vibrate) navigator.vibrate(100);
 }
 
 async function closeBarcodeScanner() {
     const overlay = document.getElementById('scannerModalOverlay');
     if (overlay) overlay.style.display = 'none';
-    
+
     if (html5QrScanner) {
         try {
             if (html5QrScanner.isScanning) {
                 await html5QrScanner.stop();
             }
             html5QrScanner.clear();
-            html5QrScanner = null; 
+            html5QrScanner = null;
         } catch (e) {
             console.log("Cleanup done");
         }
@@ -46648,30 +46753,106 @@ async function closeBarcodeScanner() {
 }
 
 // =====================================================================
-// 🌟 دوال الطباعة المباشرة من داخل السكانر (تضاف في نهاية الكود)
+// Direct print from scanner - WITHOUT opening modal
 // =====================================================================
 
-// 1. طباعة العرض المخصص (Custom Print)
+function getScannedCodesArray() {
+    if (typeof selectedProductCodes === 'undefined') return [];
+    return Array.from(selectedProductCodes).filter(Boolean);
+}
+
+function getScannerQuantityPerCode() {
+    const input = document.getElementById('scannerQuantityPerCode');
+    const value = input ? parseInt(input.value, 10) : 1;
+    return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+// طباعة العروض مباشرة بنفس منطق custom cards لكن من غير ما نفتح مودال
 async function printScannedCustom() {
-    if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes.size === 0) {
+    const scannedCodes = getScannedCodesArray();
+
+    if (scannedCodes.length === 0) {
         alert("⚠️ لم يتم مسح أي أصناف عليها عروض للطباعة!");
         return;
     }
-    await closeBarcodeScanner();
-    if (typeof openCustomPrintModal === 'function') {
-        openCustomPrintModal(); 
+
+    const quantity = getScannerQuantityPerCode();
+
+    const customCards = [];
+
+    scannedCodes.forEach(code => {
+        const offerData = (typeof getOfferTypeForCode === 'function') ? getOfferTypeForCode(code) : null;
+        if (!offerData) return;
+
+        for (let i = 0; i < quantity; i++) {
+            customCards.push({
+                Code: code,
+                offerEN: offerData.offerEN || "",
+                offerAR: offerData.offerAR || "",
+                customData: {
+                    dateRange: offerData.dateRange || "",
+                    productEN: "",
+                    productAR: "",
+                    category: ""
+                }
+            });
+        }
+    });
+
+    if (!customCards.length) {
+        alert("⚠️ لا توجد عروض صالحة للطباعة.");
+        return;
     }
+
+    await closeBarcodeScanner();
+
+    const container = document.getElementById('printContainer');
+    const loader = document.getElementById('printLoader');
+
+    if (!container) {
+        alert("⚠️ printContainer غير موجود.");
+        return;
+    }
+
+    container.innerHTML = "";
+    if (loader) loader.style.display = 'flex';
+
+    setTimeout(async () => {
+        try {
+            if (typeof renderCustomPrint === 'function') {
+                renderCustomPrint(customCards);
+            }
+            if (typeof exportRiyalSymbolsForPrint === 'function') {
+                await exportRiyalSymbolsForPrint();
+            }
+            window.print();
+        } catch (err) {
+            console.error("Direct custom print error:", err);
+            alert("حدث خطأ أثناء تجهيز الطباعة");
+        } finally {
+            if (loader) loader.style.display = 'none';
+        }
+    }, 150);
 }
 
-// 2. الطباعة الكاملة مع الباركود (Full QR Print)
+// الطباعة العادية المباشرة
 async function printScannedFullQR() {
     if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes.size === 0) {
         alert("⚠️ لم يتم مسح أي أصناف عليها عروض للطباعة!");
         return;
     }
+
     await closeBarcodeScanner();
+
     if (typeof startPrintProcess === 'function') {
-        startPrintProcess(); 
+        startPrintProcess();
+    } else {
+        alert("⚠️ دالة الطباعة العادية startPrintProcess غير موجودة.");
     }
+}
+
+// alias عشان لو الـ HTML القديم بينادي اسم مختلف
+async function printScannedFull() {
+    return printScannedFullQR();
 }
 </script>
