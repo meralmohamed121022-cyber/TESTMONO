@@ -46487,27 +46487,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 console.log('✅ Gateway & Data Ready!');
-function getWaImageBtnHTML(product) {
-  const imgUrl = product.itemurl || product.ItemURL;
-  if (imgUrl && imgUrl !== "null" && imgUrl.trim() !== "") {
-    return ""; 
-  }
-  
-  const itemName = product["Item Description"] || "Unknown Item";
-  const itemCode = product.Code || "بدون كود";
-  
-  const msg = encodeURIComponent(`مرحباً يا Mo، أود إرفاق صورة لهذا الصنف:\nالكود: ${itemCode}\nالاسم: ${itemName}`);
-  const waLink = `https://wa.me/966541932559?text=${msg}`;
-  
-  return `
-  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; width: 85%; text-align: center;">
-    <a href="${waLink}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 5px; background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 800; font-family: 'Cairo', sans-serif; font-size: 12px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); transition: transform 0.2s ease;">
-      📸 أرفق صورة للصنف
-    </a>
-  </div>
-  `;
-}
+// 1. خريطة لحفظ الأكواد الممسوحة بكمياتها
 var html5QrScanner = null; 
+var scannedItemsMap = new Map(); 
 
 async function openBarcodeScanner() {
     const overlay = document.getElementById('scannerModalOverlay');
@@ -46516,8 +46498,13 @@ async function openBarcodeScanner() {
     const readerEl = document.getElementById('reader');
     if (readerEl) {
         readerEl.innerHTML = "";
-        readerEl.style.height = "250px"; // ارتفاع ثابت ومريح للكاميرا
+        readerEl.style.height = "250px"; 
     }
+
+    // تصفير الجلسة القديمة
+    scannedItemsMap.clear();
+    document.getElementById('scannedItemsList').innerHTML = "";
+    document.getElementById('latestScannedItem').innerHTML = "<div style='color:#94a3b8; text-align:center;'>بانتظار مسح الكود...</div>";
 
     try {
         if (html5QrScanner) {
@@ -46528,10 +46515,9 @@ async function openBarcodeScanner() {
         html5QrScanner = new Html5Qrcode("reader");
 
         const config = { 
-            fps: 30, // سرعة معالجة عالية
-            qrbox: { width: 220, height: 220 }, // مربع تركيز مناسب
+            fps: 30, 
+            qrbox: { width: 220, height: 220 }, 
             aspectRatio: 1.0,
-            // تحديد الأنواع اللي تهمنا فقط لسرعة القراءة
             formatsToSupport: [ 
                 Html5QrcodeSupportedFormats.DATA_MATRIX, 
                 Html5QrcodeSupportedFormats.CODE_128 
@@ -46551,29 +46537,30 @@ async function openBarcodeScanner() {
 
 function processScannedCode(code) {
     const cleanCode = String(code).trim();
-    // البحث في الداتا بيز
+    
+    // 2. منع التكرار وزيادة الكمية بدلاً من ذلك
+    if (scannedItemsMap.has(cleanCode)) {
+        const itemData = scannedItemsMap.get(cleanCode);
+        if (itemData.isOfferActive) {
+            itemData.qty += 1; // زيادة الكمية
+            updateScannedListUI();
+            if (navigator.vibrate) navigator.vibrate(50); // هزة خفيفة
+        }
+        return; 
+    }
+
+    // 3. البحث في الداتا بيز
     const product = productsDB.find(p => String(p.Code) === cleanCode);
     
     if (product) {
-        // --- منطق تشييك العروض (الحل النهائي) ---
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-
-        // بنشوف الكود موجود في الـ Map اللي إنت بنيتها للفترة الحالية ولا لأ
+        // الاعتماد على getOffer مباشرة (حل جذري لمشكلة العروض)
         const offer = getOffer(cleanCode);
-        
-        // تشييك إضافي: هل إحنا جوه فترة العرض الحالية؟
-        let isOfferActive = false;
-        if (offer && typeof CURRENT_OFFER_START !== 'undefined') {
-            if (now >= CURRENT_OFFER_START && now <= CURRENT_OFFER_END) {
-                isOfferActive = true;
-            }
-        }
+        const isOfferActive = offer ? true : false;
 
         const nameEN = product["Item Description"] || "No Description";
         const nameAR = product["أسم المنتج"] || "";
 
-        // تحديث الواجهة بالألوان
+        // تحديث الواجهة الرئيسية للكارت
         const statusColor = isOfferActive ? "#38ef7d" : "#ff4d4d";
         const offerTitle = isOfferActive ? (offer.offerTypeAR || offer.offerType) : "❌ لا يوجد عرض متاح حالياً";
 
@@ -46586,26 +46573,114 @@ function processScannedCode(code) {
             </div>
         `;
 
-        // إضافة للطباعة "فقط" لو عليه عرض
-        if (isOfferActive) {
-            if (typeof selectedProductCodes !== 'undefined') {
-                selectedProductCodes.add(cleanCode);
-                if (typeof updateSelectedCount === 'function') updateSelectedCount();
-            }
+        // 4. الحفظ في الخريطة للتحكم في الطباعة والكميات
+        scannedItemsMap.set(cleanCode, {
+            product: product,
+            offer: offer,
+            isOfferActive: isOfferActive,
+            nameEN: nameEN,
+            nameAR: nameAR,
+            qty: 1
+        });
 
-            const row = document.createElement('div');
-            row.style.cssText = "background: rgba(56, 239, 125, 0.15); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: white; font-size: 12px; border-right: 5px solid #38ef7d; direction: rtl; text-align: right;";
-            row.innerHTML = `✅ <b>${cleanCode}</b> - ${nameAR || nameEN}`;
-            document.getElementById('scannedItemsList').prepend(row);
+        updateScannedListUI();
+
+        if (navigator.vibrate) navigator.vibrate(150); // هزة قوية للصنف الجديد
+    }
+}
+
+// دالة لتحديث قائمة الأصناف السفلية بأزرار التحكم في الكمية (+ / -)
+function updateScannedListUI() {
+    const listEl = document.getElementById('scannedItemsList');
+    listEl.innerHTML = ""; 
+
+    scannedItemsMap.forEach((data, code) => {
+        const row = document.createElement('div');
+        
+        if (data.isOfferActive) {
+            row.style.cssText = "background: rgba(56, 239, 125, 0.15); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: white; font-size: 12px; border-right: 5px solid #38ef7d; direction: rtl; display: flex; justify-content: space-between; align-items: center;";
+            row.innerHTML = `
+                <div style="flex: 1; text-align: right;">
+                    <div style="font-weight: bold; color: #38ef7d;">✅ ${code}</div>
+                    <div style="font-size: 11px; opacity: 0.9;">${data.nameAR || data.nameEN.substring(0,25)}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 6px;" dir="ltr">
+                    <button onclick="changeScanQty('${code}', -1)" style="background: #ef4444; color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-weight: bold;">-</button>
+                    <span style="font-size: 14px; font-weight: bold; min-width: 15px; text-align: center;">${data.qty}</span>
+                    <button onclick="changeScanQty('${code}', 1)" style="background: #3b82f6; color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-weight: bold;">+</button>
+                </div>
+            `;
         } else {
-            // لو مفيش عرض، بنضيفه في الليستة للتوضيح بس بلون أحمر ومبيتضافش للطباعة
-            const row = document.createElement('div');
             row.style.cssText = "background: rgba(255, 77, 77, 0.1); padding: 10px; margin-bottom: 5px; border-radius: 8px; color: #ffbaba; font-size: 12px; border-right: 5px solid #ff4d4d; direction: rtl; text-align: right;";
-            row.innerHTML = `❌ <b>${cleanCode}</b> - بدون عرض (لن يطبع)`;
-            document.getElementById('scannedItemsList').prepend(row);
+            row.innerHTML = `
+                ❌ <b>${code}</b> - بدون عرض (لن يطبع)
+                <button onclick="changeScanQty('${code}', -1)" style="float: left; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 2px 8px;">حذف</button>
+            `;
         }
+        listEl.prepend(row);
+    });
+}
 
-        if (navigator.vibrate) navigator.vibrate(100);
+// دالة لتغيير الكميات (+ / -) من الواجهة
+function changeScanQty(code, change) {
+    if (scannedItemsMap.has(code)) {
+        const data = scannedItemsMap.get(code);
+        data.qty += change;
+        if (data.qty <= 0) {
+            scannedItemsMap.delete(code); // حذفه لو الكمية صفر
+        }
+        updateScannedListUI();
+    }
+}
+
+// 5. دالة الطباعة الخاصة بالسكانر (تطبع الكميات المحددة)
+function printScannedFull() {
+    const productsToPrint = [];
+    
+    // تكرار الصنف حسب الكمية المطلوبة (qty)
+    scannedItemsMap.forEach((data, code) => {
+        if (data.isOfferActive) {
+            for (let i = 0; i < data.qty; i++) {
+                productsToPrint.push(data.product);
+            }
+        }
+    });
+
+    if (productsToPrint.length === 0) {
+        alert("⚠️ لا توجد أصناف عليها عروض صالحة للطباعة!");
+        return;
+    }
+
+    // إغلاق السكانر
+    closeBarcodeScanner();
+
+    // تشغيل الطباعة بالدالة الأصلية الخاصة بك
+    const container = document.getElementById("printContainer");
+    const loader = document.getElementById("printLoader");
+    container.innerHTML = ""; 
+    if (loader) loader.style.display = "flex";
+
+    setTimeout(() => {
+        renderPrint(productsToPrint); // الدالة بتاعتك اللي بترسم الكروت
+        
+        const qrImages = container.querySelectorAll('.qr-code-img');
+        waitForImagesToLoad(qrImages).then(() => {
+            if(loader) loader.style.display = "none";
+            setTimeout(() => window.print(), 50);
+        });
+    }, 100);
+}
+
+async function closeBarcodeScanner() {
+    const overlay = document.getElementById('scannerModalOverlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    if (html5QrScanner) {
+        try {
+            if (html5QrScanner.isScanning) await html5QrScanner.stop();
+            html5QrScanner.clear();
+            html5QrScanner = null; 
+        } catch (e) {}
     }
 }
 </script>
