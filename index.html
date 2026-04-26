@@ -46507,55 +46507,72 @@ function getWaImageBtnHTML(product) {
   </div>
   `;
 }
-let html5QrScanner = null; // سميه اسم مختلف شوية للتأكيد
+// 1. استخدام var لمنع خطأ الـ Initialization
+var html5QrScanner = null; 
 
 async function openBarcodeScanner() {
-    document.getElementById('scannerModalOverlay').style.display = 'flex';
+    // إظهار المودال فوراً
+    const overlay = document.getElementById('scannerModalOverlay');
+    if (overlay) overlay.style.display = 'flex';
     
-    // 1. تنظيف أي جلسة قديمة فوراً عشان ميحصلش تعليق (Crucial Fix)
-    if (html5QrScanner) {
-        try {
-            await html5QrScanner.stop();
-        } catch (e) {
-            // تجاهل لو هي أصلاً واقفة
+    // تنظيف الحاوية
+    const readerEl = document.getElementById('reader');
+    if (readerEl) readerEl.innerHTML = "";
+
+    try {
+        // 2. لو فيه نسخة قديمة، نوقفها ونمسحها تماماً
+        if (html5QrScanner) {
+            if (html5QrScanner.isScanning) {
+                await html5QrScanner.stop();
+            }
+            html5QrScanner.clear();
+        }
+
+        // 3. إنشاء نسخة جديدة
+        html5QrScanner = new Html5Qrcode("reader");
+
+        const config = { 
+            fps: 20, 
+            qrbox: { width: 250, height: 180 },
+            aspectRatio: 1.0 
+        };
+
+        // 4. تشغيل الكاميرا
+        await html5QrScanner.start(
+            { facingMode: "environment" }, 
+            config,
+            (decodedText) => {
+                // دالة النجاح الخاصة بك
+                if (typeof onScanSuccess === 'function') {
+                    onScanSuccess(decodedText);
+                }
+            },
+            (error) => { /* تجاهل أخطاء البحث */ }
+        );
+
+    } catch (err) {
+        console.error("Scanner Error:", err);
+        // Fallback للكاميرا الأمامية لو الخلفية مش شغالة
+        if (html5QrScanner) {
+            html5QrScanner.start({ facingMode: "user" }, { fps: 20, qrbox: 250 }, (txt) => onScanSuccess(txt), (e) => {});
         }
     }
-
-    // 2. إنشاء كائن جديد في كل مرة
-    html5QrScanner = new Html5Qrcode("reader");
-
-    const config = { 
-        fps: 20, // زودنا الفريمات لسرعة اللقط
-        qrbox: { width: 250, height: 180 },
-        aspectRatio: 1.0 
-    };
-
-    // 3. المحاولة بوضع "environment" (الكاميرا الخلفية)
-    html5QrScanner.start(
-        { facingMode: "environment" }, 
-        config,
-        (decodedText) => {
-            onScanSuccess(decodedText); 
-        },
-        (error) => { /* تجاهل أخطاء البحث */ }
-    ).catch(err => {
-        console.error("Back camera failed, trying any available...", err);
-        // 4. لو الكاميرا الخلفية فشلت (زي في بعض اللاب توبات)، يفتح الكاميرا المتاحة
-        html5QrScanner.start({ facingMode: "user" }, config, (decodedText) => {
-            onScanSuccess(decodedText);
-        }, (error) => {});
-    });
 }
 
 async function closeBarcodeScanner() {
-    document.getElementById('scannerModalOverlay').style.display = 'none';
+    const overlay = document.getElementById('scannerModalOverlay');
+    if (overlay) overlay.style.display = 'none';
+    
     if (html5QrScanner) {
         try {
-            await html5QrScanner.stop();
-            // مسح الـ HTML اللي المكتبة بتعمله جوا الـ div عشان ميعلقش المرة الجاية
-            html5QrScanner.clear(); 
+            if (html5QrScanner.isScanning) {
+                await html5QrScanner.stop();
+            }
+            html5QrScanner.clear();
+            // تصفير المتغير تماماً
+            html5QrScanner = null; 
         } catch (e) {
-            console.log("Scanner already stopped");
+            console.log("Cleanup done");
         }
     }
 }
