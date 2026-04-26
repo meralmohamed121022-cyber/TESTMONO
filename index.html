@@ -46507,73 +46507,51 @@ function getWaImageBtnHTML(product) {
   </div>
   `;
 }
-// 1. استخدام var لمنع خطأ الـ Initialization
 var html5QrScanner = null; 
 
 async function openBarcodeScanner() {
-    // إظهار المودال فوراً
     const overlay = document.getElementById('scannerModalOverlay');
     if (overlay) overlay.style.display = 'flex';
     
-    // تنظيف الحاوية
     const readerEl = document.getElementById('reader');
-    if (readerEl) readerEl.innerHTML = "";
+    if (readerEl) {
+        readerEl.innerHTML = "";
+        // 1. تصغير ارتفاع منطقة الكاميرا (خليناها مستطيلة عرضية بدل مربعة)
+        readerEl.style.height = "200px"; 
+        readerEl.style.width = "100%";
+        readerEl.style.overflow = "hidden";
+        readerEl.style.aspectRatio = "unset"; // لغينا المربع
+    }
 
     try {
-        // 2. لو فيه نسخة قديمة، نوقفها ونمسحها تماماً
         if (html5QrScanner) {
-            if (html5QrScanner.isScanning) {
-                await html5QrScanner.stop();
-            }
+            if (html5QrScanner.isScanning) await html5QrScanner.stop();
             html5QrScanner.clear();
         }
 
-        // 3. إنشاء نسخة جديدة
         html5QrScanner = new Html5Qrcode("reader");
 
         const config = { 
-            fps: 20, 
-            qrbox: { width: 250, height: 180 },
-            aspectRatio: 1.0 
+            fps: 30, 
+            // 2. تصغير مربع المسح (البرواز الأبيض) ليناسب الباركود فقط
+            qrbox: { width: 220, height: 120 }, 
+            // 3. تغيير النسبة لتكون عرضية مريحة للعين
+            aspectRatio: 1.77, 
+            formatsToSupport: [ 
+                Html5QrcodeSupportedFormats.DATA_MATRIX, 
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128 
+            ]
         };
 
-        // 4. تشغيل الكاميرا
         await html5QrScanner.start(
             { facingMode: "environment" }, 
             config,
-            (decodedText) => {
-                // دالة النجاح الخاصة بك
-                if (typeof onScanSuccess === 'function') {
-                    onScanSuccess(decodedText);
-                }
-            },
-            (error) => { /* تجاهل أخطاء البحث */ }
+            (decodedText) => { processScannedCode(decodedText); }
         );
 
     } catch (err) {
         console.error("Scanner Error:", err);
-        // Fallback للكاميرا الأمامية لو الخلفية مش شغالة
-        if (html5QrScanner) {
-            html5QrScanner.start({ facingMode: "user" }, { fps: 20, qrbox: 250 }, (txt) => onScanSuccess(txt), (e) => {});
-        }
-    }
-}
-
-async function closeBarcodeScanner() {
-    const overlay = document.getElementById('scannerModalOverlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    if (html5QrScanner) {
-        try {
-            if (html5QrScanner.isScanning) {
-                await html5QrScanner.stop();
-            }
-            html5QrScanner.clear();
-            // تصفير المتغير تماماً
-            html5QrScanner = null; 
-        } catch (e) {
-            console.log("Cleanup done");
-        }
     }
 }
 </script>
