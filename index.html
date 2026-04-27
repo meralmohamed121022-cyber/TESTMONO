@@ -46728,11 +46728,13 @@ function buildScannerCardHtml({
     nameAR = '',
     cleanCode = '',
     offerLabel = '',
+    offerLabelEN = '',
     statusColor = '#38ef7d',
     compact = false
 }) {
     const imageSize = compact ? 74 : 92;
     const titleSize = compact ? '12px' : '14px';
+    const offerEnSize = compact ? '11px' : '12px';
     const enSize = compact ? '13px' : '15px';
     const arSize = compact ? '13px' : '15px';
     const codeSize = compact ? '12px' : '13px';
@@ -46754,6 +46756,12 @@ function buildScannerCardHtml({
                 <div style="color:${statusColor}; font-weight:800; font-size:${titleSize}; margin-bottom:6px; line-height:1.35; word-break:break-word;">
                     ${escapeHtml(offerLabel || '')}
                 </div>
+
+                ${offerLabelEN ? `
+                    <div style="font-size:${offerEnSize}; color:#93c5fd; font-weight:700; margin-bottom:4px; line-height:1.35; word-break:break-word;">
+                        ${escapeHtml(offerLabelEN)}
+                    </div>
+                ` : ''}
 
                 <div style="font-size:${enSize}; color:#ffffff; font-weight:700; line-height:1.45; word-break:break-word;">
                     ${escapeHtml(nameEN || 'Unknown Product')}
@@ -46787,26 +46795,43 @@ function buildScannerCardHtml({
         </div>
     `;
 }
-
 function addScannerRowToList({
     imageUrl = '',
     nameEN = '',
     nameAR = '',
     cleanCode = '',
     offerLabel = '',
+    offerLabelEN = '',
     statusColor = '#38ef7d'
 }) {
     const listEl = document.getElementById('scannedItemsList');
     if (!listEl) return;
 
+    let bgColor = 'rgba(56,239,125,0.10)';
+
+    if (statusColor === '#ef4444') {
+        bgColor = 'rgba(239,68,68,0.10)';
+    } else if (statusColor === '#f59e0b') {
+        bgColor = 'rgba(245,158,11,0.10)';
+    }
+
     const row = document.createElement('div');
-    row.style.cssText = "margin:0;";
+    row.style.cssText = `
+        background:${bgColor};
+        border-right:4px solid ${statusColor};
+        border-radius:12px;
+        padding:0;
+        margin-bottom:6px;
+        overflow:hidden;
+    `;
+
     row.innerHTML = buildScannerCardHtml({
         imageUrl,
         nameEN,
         nameAR,
         cleanCode,
         offerLabel,
+        offerLabelEN,
         statusColor,
         compact: true
     });
@@ -46971,6 +46996,7 @@ function processScannedCode(code) {
                 nameAR: 'قاعدة المنتجات غير جاهزة',
                 cleanCode,
                 offerLabel: '❌ خطأ في تحميل قاعدة البيانات',
+                offerLabelEN: 'Database Load Error',
                 statusColor: '#ef4444',
                 compact: false
             })
@@ -46988,6 +47014,7 @@ function processScannedCode(code) {
                 nameAR: 'المنتج غير موجود في قاعدة البيانات',
                 cleanCode,
                 offerLabel: '❌ لا يوجد هذا الصنف',
+                offerLabelEN: 'Product Not Found',
                 statusColor: '#ef4444',
                 compact: false
             })
@@ -46999,6 +47026,7 @@ function processScannedCode(code) {
             nameAR: 'المنتج غير موجود في قاعدة البيانات',
             cleanCode,
             offerLabel: '❌ لا يوجد هذا الصنف',
+            offerLabelEN: 'Product Not Found',
             statusColor: '#ef4444'
         });
 
@@ -47028,6 +47056,7 @@ function processScannedCode(code) {
                 nameAR,
                 cleanCode,
                 offerLabel: '⚠️ تم مسح هذا الكود من قبل',
+                offerLabelEN: 'Already Scanned Before',
                 statusColor: '#f59e0b',
                 compact: false
             })
@@ -47041,8 +47070,12 @@ function processScannedCode(code) {
     const isOfferActive = isOfferCurrentlyActive(offer);
 
     const offerLabel = isOfferActive
-        ? (offer?.offerTypeAR || offer?.offerType || 'العرض متاح')
+        ? (offer?.offerTypeAR || offer?.offerAR || offer?.offerType || 'العرض متاح')
         : '❌ لا يوجد عرض نشط حالياً';
+
+    const offerLabelEN = isOfferActive
+        ? (offer?.offerTypeEN || offer?.offerEN || offer?.offerType || 'Offer Active')
+        : 'No Active Offer Right Now';
 
     const statusColor = isOfferActive ? '#38ef7d' : '#ef4444';
 
@@ -47053,6 +47086,7 @@ function processScannedCode(code) {
             nameAR,
             cleanCode,
             offerLabel,
+            offerLabelEN,
             statusColor,
             compact: false
         })
@@ -47064,6 +47098,7 @@ function processScannedCode(code) {
         nameAR,
         cleanCode,
         offerLabel,
+        offerLabelEN,
         statusColor
     });
 
@@ -47083,7 +47118,6 @@ function processScannedCode(code) {
         if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
     }
 }
-
 // =====================================================
 // Close Scanner
 // =====================================================
