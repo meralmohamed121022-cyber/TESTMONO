@@ -4447,6 +4447,10 @@ body > div:has(> label[for="codesFileInput"]),
                     />
                 </div>
 
+                <button onclick="resetScannerSession()" style="width:100%; margin-bottom:8px; padding:12px 14px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">
+                    مسح القائمة / Reset
+                </button>
+
                 <button onclick="toggleScannerPrintPanel(); printScannedCustom()" style="width:100%; margin-bottom:8px; padding:12px 14px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">
                     طباعة نوع العرض فقط
                 </button>
@@ -46613,6 +46617,7 @@ var scannedCodesSet = new Set();
 var scannerCardsPerCode = 1;
 var lastScannedValue = "";
 var lastScannedAt = 0;
+var scannedItemsMemory = [];
 
 // =====================================================
 // Helpers
@@ -46629,6 +46634,89 @@ function escapeHtml(value) {
 function setLatestScannerMessage(html) {
     const latestEl = document.getElementById('latestScannedItem');
     if (latestEl) latestEl.innerHTML = html;
+}
+
+function getScannerWaitingHtml() {
+    return `
+        <div style="color:#94a3b8;font-size:14px;text-align:center;">بانتظار مسح الكود</div>
+    `;
+}
+
+function rememberScannedItem(item) {
+    if (!item || !item.cleanCode) return;
+
+    scannedItemsMemory.push({
+        imageUrl: item.imageUrl || '',
+        nameEN: item.nameEN || '',
+        nameAR: item.nameAR || '',
+        cleanCode: item.cleanCode || '',
+        offerLabel: item.offerLabel || '',
+        offerLabelEN: item.offerLabelEN || '',
+        statusColor: item.statusColor || '#38ef7d'
+    });
+}
+
+function renderScannerSavedState() {
+    const listEl = document.getElementById('scannedItemsList');
+    if (listEl) listEl.innerHTML = '';
+
+    scannedItemsMemory.forEach(item => {
+        addScannerRowToList({
+            imageUrl: item.imageUrl,
+            nameEN: item.nameEN,
+            nameAR: item.nameAR,
+            cleanCode: item.cleanCode,
+            offerLabel: item.offerLabel,
+            offerLabelEN: item.offerLabelEN,
+            statusColor: item.statusColor
+        });
+    });
+
+    if (scannedItemsMemory.length) {
+        const lastItem = scannedItemsMemory[scannedItemsMemory.length - 1];
+
+        setLatestScannerMessage(
+            buildScannerCardHtml({
+                imageUrl: lastItem.imageUrl,
+                nameEN: lastItem.nameEN,
+                nameAR: lastItem.nameAR,
+                cleanCode: lastItem.cleanCode,
+                offerLabel: lastItem.offerLabel,
+                offerLabelEN: lastItem.offerLabelEN,
+                statusColor: lastItem.statusColor,
+                compact: false
+            })
+        );
+    } else {
+        setLatestScannerMessage(getScannerWaitingHtml());
+    }
+}
+
+function resetScannerSession() {
+    scannedItemsMemory = [];
+
+    if (typeof scannedCodesSet !== 'undefined' && scannedCodesSet?.clear) {
+        scannedCodesSet.clear();
+    }
+
+    if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes?.clear) {
+        selectedProductCodes.clear();
+    }
+
+    lastScannedValue = "";
+    lastScannedAt = 0;
+
+    if (typeof updateSelectedCount === 'function') {
+        updateSelectedCount();
+    }
+
+    const listEl = document.getElementById('scannedItemsList');
+    if (listEl) listEl.innerHTML = '';
+
+    const printPanel = document.getElementById('scannerPrintPanel');
+    if (printPanel) printPanel.style.display = 'none';
+
+    setLatestScannerMessage(getScannerWaitingHtml());
 }
 
 async function destroyScannerInstance() {
@@ -46691,7 +46779,7 @@ function getScannerImageUrl(product) {
 }
 
 function getScannerThumbMarkup(imageUrl, altText, size) {
-    const safeImageUrl = imageUrl && /^https?:\/\//i.test(imageUrl) ? escapeHtml(imageUrl) : '';
+    const safeImageUrl = imageUrl && /^https?:\/\/+/i.test(imageUrl) ? escapeHtml(imageUrl) : '';
     const safeAlt = escapeHtml(altText || 'Product');
 
     return `
@@ -46795,6 +46883,7 @@ function buildScannerCardHtml({
         </div>
     `;
 }
+
 function addScannerRowToList({
     imageUrl = '',
     nameEN = '',
@@ -46845,7 +46934,6 @@ function addScannerRowToList({
 async function openBarcodeScanner() {
     const overlay = document.getElementById('scannerModalOverlay');
     const readerEl = document.getElementById('reader');
-    const listEl = document.getElementById('scannedItemsList');
     const printPanel = document.getElementById('scannerPrintPanel');
 
     if (overlay) overlay.style.display = 'flex';
@@ -46861,26 +46949,9 @@ async function openBarcodeScanner() {
         readerEl.style.position = 'relative';
     }
 
-    if (listEl) listEl.innerHTML = '';
     if (printPanel) printPanel.style.display = 'none';
 
-    setLatestScannerMessage(`
-        <div style="color:#94a3b8;font-size:13px;text-align:center;line-height:1.8;">
-            جاري تجهيز الكاميرا...
-        </div>
-    `);
-
-    if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes?.clear) {
-        selectedProductCodes.clear();
-    }
-
-    if (typeof updateSelectedCount === 'function') {
-        updateSelectedCount();
-    }
-
-    if (typeof scannedCodesSet !== 'undefined' && scannedCodesSet?.clear) {
-        scannedCodesSet.clear();
-    }
+    renderScannerSavedState();
 
     lastScannedValue = "";
     lastScannedAt = 0;
@@ -46965,11 +47036,13 @@ async function openBarcodeScanner() {
             }
         }, 400);
 
-        setLatestScannerMessage(`
-            <div style="color:#22c55e;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
-                الكاميرا شغالة، وجّه الباركود داخل المساحة الأفقية
-            </div>
-        `);
+        if (!scannedItemsMemory.length) {
+            setLatestScannerMessage(`
+                <div style="color:#22c55e;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
+                    الكاميرا شغالة، وجّه الباركود داخل المساحة الأفقية
+                </div>
+            `);
+        }
 
     } catch (err) {
         console.error("Scanner Error:", err);
@@ -46981,7 +47054,9 @@ async function openBarcodeScanner() {
         `);
         await destroyScannerInstance();
     }
-}// =====================================================
+}
+
+// =====================================================
 // Process Code
 // =====================================================
 function processScannedCode(code) {
@@ -47007,20 +47082,7 @@ function processScannedCode(code) {
     const product = productsDB.find(p => String(p.Code || '').trim() === cleanCode);
 
     if (!product) {
-        setLatestScannerMessage(
-            buildScannerCardHtml({
-                imageUrl: '',
-                nameEN: 'Product Not Found',
-                nameAR: 'المنتج غير موجود في قاعدة البيانات',
-                cleanCode,
-                offerLabel: '❌ لا يوجد هذا الصنف',
-                offerLabelEN: 'Product Not Found',
-                statusColor: '#ef4444',
-                compact: false
-            })
-        );
-
-        addScannerRowToList({
+        const itemData = {
             imageUrl: '',
             nameEN: 'Product Not Found',
             nameAR: 'المنتج غير موجود في قاعدة البيانات',
@@ -47028,7 +47090,17 @@ function processScannedCode(code) {
             offerLabel: '❌ لا يوجد هذا الصنف',
             offerLabelEN: 'Product Not Found',
             statusColor: '#ef4444'
-        });
+        };
+
+        setLatestScannerMessage(
+            buildScannerCardHtml({
+                ...itemData,
+                compact: false
+            })
+        );
+
+        addScannerRowToList(itemData);
+        rememberScannedItem(itemData);
 
         if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
         return;
@@ -47079,20 +47151,7 @@ function processScannedCode(code) {
 
     const statusColor = isOfferActive ? '#38ef7d' : '#ef4444';
 
-    setLatestScannerMessage(
-        buildScannerCardHtml({
-            imageUrl,
-            nameEN,
-            nameAR,
-            cleanCode,
-            offerLabel,
-            offerLabelEN,
-            statusColor,
-            compact: false
-        })
-    );
-
-    addScannerRowToList({
+    const itemData = {
         imageUrl,
         nameEN,
         nameAR,
@@ -47100,7 +47159,17 @@ function processScannedCode(code) {
         offerLabel,
         offerLabelEN,
         statusColor
-    });
+    };
+
+    setLatestScannerMessage(
+        buildScannerCardHtml({
+            ...itemData,
+            compact: false
+        })
+    );
+
+    addScannerRowToList(itemData);
+    rememberScannedItem(itemData);
 
     scannedCodesSet.add(cleanCode);
 
@@ -47118,6 +47187,7 @@ function processScannedCode(code) {
         if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
     }
 }
+
 // =====================================================
 // Close Scanner
 // =====================================================
