@@ -4404,27 +4404,38 @@ body > div:has(> label[for="codesFileInput"]),
         📷
     </button>
 </div>
-<div id="scannerModalOverlay" style="display: none; position: fixed; inset: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); z-index: 100000; flex-direction: column; align-items: stretch; justify-content: center; padding: 10px;">
-    <div style="width: 98vw; height: 96vh; background: #1e293b; border-radius: 18px; overflow: hidden; border: 2px solid #667eea; position: relative; box-shadow: 0 0 25px rgba(0,0,0,0.55); display: flex; flex-direction: column;">
-        
-        <button onclick="closeBarcodeScanner()" style="position: absolute; right: 12px; top: 12px; z-index: 1001; background: #ef4444; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-weight: bold; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">✕</button>
-        
-        <div id="reader" style="width: 100%; background: #000; border-bottom: 2px solid #667eea; min-height: 320px;"></div>
-        
-        <div id="latestScannedItem" style="padding: 14px; background: #0f172a; color: white; text-align: right; min-height: 120px; border-bottom: 1px solid #334155;">
-            <div style="color: #94a3b8; font-size: 14px; text-align: center;">بانتظار مسح الكود</div>
-        </div>
-        
-        <div style="flex: 1; overflow-y: auto; background: #1e293b; padding: 10px 12px; border-top: 1px solid #334155;">
-            <div id="scannedItemsList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+<div id="scannerModalOverlay" style="display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,0.88); z-index:100000; flex-direction:column; align-items:center; justify-content:center; padding:8px;">
+    <div style="width:100%; max-width:520px; height:96vh; background:#1e293b; border-radius:18px; overflow:hidden; border:2px solid #667eea; position:relative; box-shadow:0 0 25px rgba(0,0,0,0.55); display:flex; flex-direction:column;">
+
+        <button onclick="closeBarcodeScanner()" style="position:absolute; right:12px; top:12px; z-index:1001; background:#ef4444; color:white; border:none; border-radius:50%; width:40px; height:40px; cursor:pointer; font-weight:bold; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.25);">✕</button>
+
+        <div style="padding:8px 8px 0; background:#111827; border-bottom:1px solid #334155;">
+            <div style="position:relative; width:100%;">
+                <div id="reader" style="width:100%; height:clamp(240px, 40vh, 340px); min-height:240px; background:#000; border:2px solid #667eea; border-radius:18px; overflow:hidden;"></div>
+
+                <div style="pointer-events:none; position:absolute; inset:10px; border:2px solid rgba(255,255,255,0.72); border-radius:16px; box-shadow:inset 0 0 0 1px rgba(102,126,234,0.35);"></div>
+
+                <div style="pointer-events:none; position:absolute; left:0; right:0; bottom:12px; text-align:center;">
+                    <span style="display:inline-block; background:rgba(15,23,42,0.75); color:#e2e8f0; font-size:12px; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.14);">
+                        وجّه الباركود داخل كامل مساحة الكاميرا
+                    </span>
+                </div>
+            </div>
         </div>
 
-        <div id="scannerFabWrap" style="position: absolute; left: 14px; bottom: 14px; z-index: 1005; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
-            
-            <div id="scannerPrintPanel" style="display: none; min-width: 260px; background: rgba(15,23,42,0.97); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 12px; box-shadow: 0 18px 35px rgba(0,0,0,0.35); backdrop-filter: blur(10px);">
+        <div id="latestScannedItem" style="padding:12px; background:#0f172a; color:white; text-align:right; min-height:128px; border-bottom:1px solid #334155;">
+            <div style="color:#94a3b8; font-size:14px; text-align:center;">بانتظار مسح الكود</div>
+        </div>
+
+        <div style="flex:1; overflow-y:auto; background:#1e293b; padding:10px 12px 100px; border-top:1px solid #334155;">
+            <div id="scannedItemsList" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+
+        <div id="scannerFabWrap" style="position:absolute; left:14px; bottom:14px; z-index:1005; display:flex; flex-direction:column; align-items:flex-start; gap:10px;">
+            <div id="scannerPrintPanel" style="display:none; min-width:270px; background:rgba(15,23,42,0.97); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:12px; box-shadow:0 18px 35px rgba(0,0,0,0.35); backdrop-filter:blur(10px);">
                 
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,0.05); padding: 10px 12px; border-radius: 14px; margin-bottom: 10px;">
-                    <label for="scannerQuantityPerCode" style="color: #fff; font-size: 13px; font-weight: bold; direction: rtl; white-space: nowrap;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:14px; margin-bottom:10px;">
+                    <label for="scannerQuantityPerCode" style="color:#fff; font-size:13px; font-weight:bold; direction:rtl; white-space:nowrap;">
                         عدد الكروت
                     </label>
                     <input
@@ -4432,20 +4443,20 @@ body > div:has(> label[for="codesFileInput"]),
                         type="number"
                         value="1"
                         min="1"
-                        style="width: 58px; height: 42px; padding: 0; background: #111827; border: 1px solid #475569; color: #fff; border-radius: 999px; text-align: center; font-weight: bold; outline: none;"
+                        style="width:58px; height:42px; padding:0; background:#111827; border:1px solid #475569; color:#fff; border-radius:999px; text-align:center; font-weight:bold; outline:none;"
                     />
                 </div>
 
-                <button onclick="toggleScannerPrintPanel(); printScannedCustom()" style="width: 100%; margin-bottom: 8px; padding: 12px 14px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 14px; font-weight: bold; cursor: pointer;">
+                <button onclick="toggleScannerPrintPanel(); printScannedCustom()" style="width:100%; margin-bottom:8px; padding:12px 14px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">
                     طباعة نوع العرض فقط
                 </button>
 
-                <button onclick="toggleScannerPrintPanel(); printScannedFullQR()" style="width: 100%; padding: 12px 14px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 14px; font-weight: bold; cursor: pointer;">
+                <button onclick="toggleScannerPrintPanel(); printScannedFullQR()" style="width:100%; padding:12px 14px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">
                     طباعة كافة التفاصيل
                 </button>
             </div>
 
-            <button onclick="toggleScannerPrintPanel()" style="width: 62px; height: 62px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.9); background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); color: white; box-shadow: 0 8px 20px rgba(255,75,43,0.45); cursor: pointer; font-size: 26px; display: flex; align-items: center; justify-content: center;">
+            <button onclick="toggleScannerPrintPanel()" style="width:62px; height:62px; border-radius:50%; border:2px solid rgba(255,255,255,0.9); background:linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); color:white; box-shadow:0 8px 20px rgba(255,75,43,0.45); cursor:pointer; font-size:26px; display:flex; align-items:center; justify-content:center;">
                 🖨️
             </button>
         </div>
@@ -46671,6 +46682,138 @@ function buildNoImageBox(text) {
     `;
 }
 
+function getScannerImageUrl(product) {
+    return String(
+        product?.itemurl ||
+        product?.ItemURL ||
+        ''
+    ).trim();
+}
+
+function getScannerThumbMarkup(imageUrl, altText, size) {
+    const safeImageUrl = imageUrl && /^https?:\/\//i.test(imageUrl) ? escapeHtml(imageUrl) : '';
+    const safeAlt = escapeHtml(altText || 'Product');
+
+    return `
+        <div style="
+            width:${size}px;
+            height:${size}px;
+            border-radius:16px;
+            overflow:hidden;
+            background:#fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            flex-shrink:0;
+            border:1px solid #334155;
+        ">
+            ${
+                safeImageUrl
+                    ? `<img
+                        src="${safeImageUrl}"
+                        alt="${safeAlt}"
+                        referrerpolicy="no-referrer"
+                        style="width:100%;height:100%;object-fit:contain;background:#fff;"
+                        onerror="this.outerHTML='<div style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;text-align:center;line-height:1.35;background:#fff;padding:6px;&quot;>No Image</div>';"
+                    >`
+                    : `<div style="color:#94a3b8;font-size:11px;text-align:center;line-height:1.35;background:#fff;padding:6px;">No Image</div>`
+            }
+        </div>
+    `;
+}
+
+function buildScannerCardHtml({
+    imageUrl = '',
+    nameEN = '',
+    nameAR = '',
+    cleanCode = '',
+    offerLabel = '',
+    statusColor = '#38ef7d',
+    compact = false
+}) {
+    const imageSize = compact ? 74 : 92;
+    const titleSize = compact ? '12px' : '14px';
+    const enSize = compact ? '13px' : '15px';
+    const arSize = compact ? '13px' : '15px';
+    const codeSize = compact ? '12px' : '13px';
+    const pad = compact ? '10px' : '12px';
+
+    return `
+        <div style="
+            display:flex;
+            gap:12px;
+            align-items:center;
+            background:rgba(255,255,255,0.04);
+            padding:${pad};
+            border-radius:18px;
+            border:1px solid rgba(255,255,255,0.10);
+        ">
+            ${getScannerThumbMarkup(imageUrl, nameEN || cleanCode, imageSize)}
+
+            <div style="flex:1; min-width:0; text-align:right;">
+                <div style="color:${statusColor}; font-weight:800; font-size:${titleSize}; margin-bottom:6px; line-height:1.35; word-break:break-word;">
+                    ${escapeHtml(offerLabel || '')}
+                </div>
+
+                <div style="font-size:${enSize}; color:#ffffff; font-weight:700; line-height:1.45; word-break:break-word;">
+                    ${escapeHtml(nameEN || 'Unknown Product')}
+                </div>
+
+                <div style="font-size:${arSize}; color:#fbbf24; font-family:Cairo,sans-serif; direction:rtl; margin:4px 0 0; line-height:1.45; word-break:break-word;">
+                    ${escapeHtml(nameAR || '')}
+                </div>
+
+                <div style="margin-top:8px;">
+                    <span style="
+                        display:inline-flex;
+                        align-items:center;
+                        gap:6px;
+                        background:rgba(15,23,42,0.95);
+                        border:1px solid rgba(148,163,184,0.35);
+                        padding:6px 10px;
+                        border-radius:999px;
+                        color:#e2e8f0;
+                        font-family:monospace;
+                        font-size:${codeSize};
+                        font-weight:700;
+                        max-width:100%;
+                        overflow:hidden;
+                        text-overflow:ellipsis;
+                    ">
+                        CODE: ${escapeHtml(cleanCode)}
+                    </span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function addScannerRowToList({
+    imageUrl = '',
+    nameEN = '',
+    nameAR = '',
+    cleanCode = '',
+    offerLabel = '',
+    statusColor = '#38ef7d'
+}) {
+    const listEl = document.getElementById('scannedItemsList');
+    if (!listEl) return;
+
+    const row = document.createElement('div');
+    row.style.cssText = "margin:0;";
+    row.innerHTML = buildScannerCardHtml({
+        imageUrl,
+        nameEN,
+        nameAR,
+        cleanCode,
+        offerLabel,
+        statusColor,
+        compact: true
+    });
+
+    listEl.prepend(row);
+}
+
 // =====================================================
 // Open Scanner
 // =====================================================
@@ -46678,16 +46821,53 @@ async function openBarcodeScanner() {
     const overlay = document.getElementById('scannerModalOverlay');
     const readerEl = document.getElementById('reader');
     const listEl = document.getElementById('scannedItemsList');
+    const printPanel = document.getElementById('scannerPrintPanel');
 
     if (overlay) overlay.style.display = 'flex';
-    if (readerEl) readerEl.innerHTML = '';
+
+    if (readerEl) {
+        readerEl.innerHTML = '';
+        readerEl.style.width = '100%';
+        readerEl.style.height = window.innerWidth <= 768 ? '280px' : '340px';
+        readerEl.style.minHeight = window.innerWidth <= 768 ? '260px' : '320px';
+        readerEl.style.background = '#000';
+        readerEl.style.borderRadius = '18px';
+        readerEl.style.overflow = 'hidden';
+        readerEl.style.position = 'relative';
+    }
+
     if (listEl) listEl.innerHTML = '';
+    if (printPanel) printPanel.style.display = 'none';
 
     setLatestScannerMessage(`
         <div style="color:#94a3b8;font-size:13px;text-align:center;line-height:1.8;">
             جاري تجهيز الكاميرا...
         </div>
     `);
+
+    if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes?.clear) {
+        selectedProductCodes.clear();
+    }
+
+    if (typeof updateSelectedCount === 'function') {
+        updateSelectedCount();
+    }
+
+    if (typeof scannedCodesSet !== 'undefined' && scannedCodesSet?.clear) {
+        scannedCodesSet.clear();
+    }
+
+    lastScannedValue = "";
+    lastScannedAt = 0;
+
+    if (typeof Html5Qrcode === 'undefined') {
+        setLatestScannerMessage(`
+            <div style="color:#ef4444;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
+                مكتبة html5-qrcode غير محملة
+            </div>
+        `);
+        return;
+    }
 
     if (!window.isSecureContext) {
         setLatestScannerMessage(`
@@ -46710,6 +46890,8 @@ async function openBarcodeScanner() {
     try {
         await destroyScannerInstance();
 
+        const isMobile = window.innerWidth <= 768;
+
         const warmup = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: "environment" } },
             audio: false
@@ -46731,9 +46913,23 @@ async function openBarcodeScanner() {
         };
 
         const config = {
-            fps: 10,
-            qrbox: { width: 220, height: 220 }
+            fps: isMobile ? 10 : 10,
+            aspectRatio: isMobile ? 1.7777778 : 1.3333333,
+            qrbox: isMobile
+                ? { width: 250, height: 110 }
+                : { width: 300, height: 130 }
         };
+
+        if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+            config.formatsToSupport = [
+                Html5QrcodeSupportedFormats.CODE128,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.QRCODE
+            ];
+        }
 
         try {
             await html5QrScanner.start(
@@ -46742,13 +46938,31 @@ async function openBarcodeScanner() {
                 onScanSuccess,
                 () => {}
             );
-        } catch (e) {
-            await html5QrScanner.start(
-                { facingMode: "environment" },
-                config,
-                onScanSuccess,
-                () => {}
-            );
+        } catch (e1) {
+            try {
+                await html5QrScanner.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess,
+                    () => {}
+                );
+            } catch (e2) {
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || !cameras.length) {
+                    throw new Error("No camera found");
+                }
+
+                const preferredCamera = cameras.find(cam =>
+                    /back|rear|environment/i.test(cam.label || '')
+                ) || cameras[0];
+
+                await html5QrScanner.start(
+                    preferredCamera.id,
+                    config,
+                    onScanSuccess,
+                    () => {}
+                );
+            }
         }
 
         setTimeout(() => {
@@ -46760,14 +46974,15 @@ async function openBarcodeScanner() {
                 video.muted = true;
                 video.style.width = "100%";
                 video.style.height = "100%";
-                video.style.objectFit = "cover";
+                video.style.objectFit = "contain";
+                video.style.background = "#000";
                 video.play().catch(() => {});
             }
         }, 400);
 
         setLatestScannerMessage(`
             <div style="color:#22c55e;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
-                الكاميرا شغالة، وجّهها نحو الباركود
+                الكاميرا شغالة، وجّه الباركود داخل المستطيل الأوسط
             </div>
         `);
 
@@ -46786,130 +47001,130 @@ async function openBarcodeScanner() {
 // Process Code
 // =====================================================
 function processScannedCode(code) {
-    const cleanCode = String(code || "").trim();
+    const cleanCode = String(code || '').trim();
     if (!cleanCode) return;
 
-    const listEl = document.getElementById('scannedItemsList');
-
     if (!Array.isArray(window.productsDB) || !productsDB.length) {
-        setLatestScannerMessage(`
-            <div style="display:flex;gap:10px;align-items:center;">
-                <div style="width:64px;height:64px;border-radius:10px;background:#0f172a;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;flex-shrink:0;border:1px solid #334155;">
-                    خطأ
-                </div>
-                <div style="flex:1;text-align:right;">
-                    <div style="color:#ef4444;font-weight:bold;font-size:13px;margin-bottom:4px;">❌ قاعدة المنتجات غير جاهزة</div>
-                    <div style="color:#e2e8f0;font-family:monospace;font-size:12px;">CODE: ${escapeHtml(cleanCode)}</div>
-                </div>
-            </div>
-        `);
+        setLatestScannerMessage(
+            buildScannerCardHtml({
+                imageUrl: '',
+                nameEN: 'Products DB Not Ready',
+                nameAR: 'قاعدة المنتجات غير جاهزة',
+                cleanCode,
+                offerLabel: '❌ خطأ في تحميل قاعدة البيانات',
+                statusColor: '#ef4444',
+                compact: false
+            })
+        );
         return;
     }
 
-    if (scannedCodesSet.has(cleanCode)) {
-        setLatestScannerMessage(`
-            <div style="display:flex;gap:10px;align-items:center;">
-                <div style="width:64px;height:64px;border-radius:10px;background:#0f172a;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;flex-shrink:0;border:1px solid #334155;">
-                    مكرر
-                </div>
-                <div style="flex:1;text-align:right;">
-                    <div style="color:#f59e0b;font-weight:bold;font-size:13px;margin-bottom:4px;">⚠️ تم مسح هذا الكود من قبل</div>
-                    <div style="color:#e2e8f0;font-family:monospace;font-size:12px;">CODE: ${escapeHtml(cleanCode)}</div>
-                </div>
-            </div>
-        `);
-
-        if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
-        return;
-    }
-
-    const product = productsDB.find(p => String(p.Code || "").trim() === cleanCode);
+    const product = productsDB.find(p => String(p.Code || '').trim() === cleanCode);
 
     if (!product) {
-        setLatestScannerMessage(`
-            <div style="display:flex;gap:10px;align-items:center;">
-                <div style="width:64px;height:64px;border-radius:10px;background:#0f172a;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;flex-shrink:0;border:1px solid #334155;">
-                    لا يوجد
-                </div>
-                <div style="flex:1;text-align:right;">
-                    <div style="color:#ef4444;font-weight:bold;font-size:13px;margin-bottom:4px;">❌ المنتج غير موجود في قاعدة البيانات</div>
-                    <div style="color:#e2e8f0;font-family:monospace;font-size:12px;">CODE: ${escapeHtml(cleanCode)}</div>
-                </div>
-            </div>
-        `);
+        setLatestScannerMessage(
+            buildScannerCardHtml({
+                imageUrl: '',
+                nameEN: 'Product Not Found',
+                nameAR: 'المنتج غير موجود في قاعدة البيانات',
+                cleanCode,
+                offerLabel: '❌ لا يوجد هذا الصنف',
+                statusColor: '#ef4444',
+                compact: false
+            })
+        );
+
+        addScannerRowToList({
+            imageUrl: '',
+            nameEN: 'Product Not Found',
+            nameAR: 'المنتج غير موجود في قاعدة البيانات',
+            cleanCode,
+            offerLabel: '❌ لا يوجد هذا الصنف',
+            statusColor: '#ef4444'
+        });
 
         if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
+        return;
+    }
+
+    const nameEN =
+        product["Item Description English"] ||
+        product["Item Description"] ||
+        product["Item Description EN"] ||
+        "English Name Not Found";
+
+    const nameAR =
+        product["أسم المنتج"] ||
+        product["اسم المنتج"] ||
+        product["Item Description AR"] ||
+        "";
+
+    const imageUrl = getScannerImageUrl(product);
+
+    if (scannedCodesSet.has(cleanCode)) {
+        setLatestScannerMessage(
+            buildScannerCardHtml({
+                imageUrl,
+                nameEN,
+                nameAR,
+                cleanCode,
+                offerLabel: '⚠️ تم مسح هذا الكود من قبل',
+                statusColor: '#f59e0b',
+                compact: false
+            })
+        );
+
+        if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
         return;
     }
 
     const offer = getOfferForScanner(cleanCode);
     const isOfferActive = isOfferCurrentlyActive(offer);
 
-    const nameEN = product["Item Description"] || "English Name Not Found";
-    const nameAR = product["أسم المنتج"] || product["Item Description AR"] || "";
-    const imageUrl = String(product.itemurl || product.ItemURL || "").trim();
-
-    const statusColor = isOfferActive ? "#38ef7d" : "#ef4444";
     const offerLabel = isOfferActive
-        ? (offer?.offerTypeAR || offer?.offerType || "Offer Active")
-        : "❌ لا يوجد عرض نشط حالياً";
+        ? (offer?.offerTypeAR || offer?.offerType || 'العرض متاح')
+        : '❌ لا يوجد عرض نشط حالياً';
 
-    setLatestScannerMessage(`
-        <div style="display:flex;gap:10px;align-items:center;">
-            <div style="width:64px;height:64px;border-radius:10px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid #334155;">
-                ${
-                    imageUrl && /^https?:\/\/+/i.test(imageUrl)
-                        ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(nameEN)}"
-                               style="width:100%;height:100%;object-fit:contain;"
-                               onerror="this.style.display='none'; this.parentNode.innerHTML='${buildNoImageBox("No Image").replace(/'/g, "\\'")}';">`
-                        : buildNoImageBox("No Image")
-                }
-            </div>
+    const statusColor = isOfferActive ? '#38ef7d' : '#ef4444';
 
-            <div style="flex:1;text-align:right;min-width:0;">
-                <div style="color:${statusColor};font-weight:bold;font-size:13px;margin-bottom:4px;">${escapeHtml(offerLabel)}</div>
-                <div style="font-size:13px;color:white;font-weight:600;line-height:1.4;">${escapeHtml(nameEN)}</div>
-                <div style="font-size:13px;color:#fbbf24;font-family:'Cairo',sans-serif;direction:rtl;margin:2px 0;line-height:1.4;">${escapeHtml(nameAR)}</div>
-                <div style="color:#94a3b8;font-family:monospace;font-size:11px;">CODE: ${escapeHtml(cleanCode)}</div>
-            </div>
-        </div>
-    `);
+    setLatestScannerMessage(
+        buildScannerCardHtml({
+            imageUrl,
+            nameEN,
+            nameAR,
+            cleanCode,
+            offerLabel,
+            statusColor,
+            compact: false
+        })
+    );
+
+    addScannerRowToList({
+        imageUrl,
+        nameEN,
+        nameAR,
+        cleanCode,
+        offerLabel,
+        statusColor
+    });
 
     scannedCodesSet.add(cleanCode);
 
     if (isOfferActive) {
         if (typeof selectedProductCodes !== 'undefined' && selectedProductCodes?.add) {
             selectedProductCodes.add(cleanCode);
-
-            if (typeof updateSelectedCount === 'function') {
-                updateSelectedCount(true);
-            }
         }
 
-        if (listEl) {
-            const row = document.createElement('div');
-            row.style.cssText = "background: rgba(56,239,125,0.1); padding: 8px; margin-bottom: 6px; border-radius: 8px; color: white; font-size: 12px; border-right: 4px solid #38ef7d; direction: rtl; text-align: right;";
-            row.innerHTML = `
-                <div style="font-weight:bold;">✅ ${escapeHtml(cleanCode)}</div>
-                <div style="font-size:11px;opacity:0.9;">${escapeHtml(nameAR)}</div>
-                <div style="font-size:10px;color:#38ef7d;">${escapeHtml(nameEN.substring(0, 30))}</div>
-            `;
-            listEl.prepend(row);
+        if (typeof updateSelectedCount === 'function') {
+            updateSelectedCount(true);
         }
+
+        if (navigator.vibrate) navigator.vibrate(90);
     } else {
-        if (listEl) {
-            const row = document.createElement('div');
-            row.style.cssText = "background: rgba(239,68,68,0.1); padding: 8px; margin-bottom: 6px; border-radius: 8px; color: #ff9999; font-size: 12px; border-right: 4px solid #ef4444; direction: rtl; text-align: right;";
-            row.innerHTML = `
-                <div style="font-weight:bold;">⚠️ ${escapeHtml(cleanCode)} (بدون عرض)</div>
-                <div style="font-size:11px;opacity:0.9;">${escapeHtml(nameAR)}</div>
-            `;
-            listEl.prepend(row);
-        }
+        if (navigator.vibrate) navigator.vibrate([100, 80, 100]);
     }
-
-    if (navigator.vibrate) navigator.vibrate(100);
 }
+
 // =====================================================
 // Close Scanner
 // =====================================================
@@ -46988,7 +47203,9 @@ async function printScannedCustom() {
         return;
     }
 
-    injectPrintStylesOnce();
+    if (typeof injectPrintStylesOnce === 'function') {
+        injectPrintStylesOnce();
+    }
 
     const quantity = getScannerQuantityPerCode();
     const customCards = [];
@@ -47057,8 +47274,11 @@ async function printScannedCustom() {
         }
     }, 150);
 
-    window.addEventListener('afterprint', restoreRiyalSymbolsAfterPrint, { once: true });
+    if (typeof restoreRiyalSymbolsAfterPrint === 'function') {
+        window.addEventListener('afterprint', restoreRiyalSymbolsAfterPrint, { once: true });
+    }
 }
+
 // =====================================================
 // Direct normal print
 // =====================================================
@@ -47126,8 +47346,10 @@ async function printScannedFullQR() {
 async function printScannedFull() {
     return printScannedFullQR();
 }
-// Alias for old HTML
-async function printScannedFull() {
-    return printScannedFullQR();
+
+function toggleScannerPrintPanel() {
+    const panel = document.getElementById('scannerPrintPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
 }
 </script>
