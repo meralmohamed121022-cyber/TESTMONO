@@ -46869,15 +46869,6 @@ async function openBarcodeScanner() {
         return;
     }
 
-    if (!window.isSecureContext) {
-        setLatestScannerMessage(`
-            <div style="color:#ef4444;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
-                الكاميرا تحتاج تشغيل الصفحة على HTTPS أو localhost
-            </div>
-        `);
-        return;
-    }
-
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setLatestScannerMessage(`
             <div style="color:#ef4444;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
@@ -46890,80 +46881,49 @@ async function openBarcodeScanner() {
     try {
         await destroyScannerInstance();
 
-        const isMobile = window.innerWidth <= 768;
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || !cameras.length) {
+            throw new Error("NO CAMERA FOUND");
+        }
 
-        const warmup = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } },
-            audio: false
-        });
-        warmup.getTracks().forEach(track => track.stop());
+        const preferredCamera = cameras.find(cam =>
+            /back|rear|environment/i.test(cam.label || '')
+        ) || cameras[0];
 
         html5QrScanner = new Html5Qrcode("reader");
 
-        const onScanSuccess = (decodedText) => {
-            const cleanDecoded = String(decodedText || "").trim();
-            const nowTs = Date.now();
-
-            if (!cleanDecoded) return;
-            if (cleanDecoded === lastScannedValue && nowTs - lastScannedAt < 1200) return;
-
-            lastScannedValue = cleanDecoded;
-            lastScannedAt = nowTs;
-            processScannedCode(cleanDecoded);
-        };
-
         const config = {
-            fps: isMobile ? 10 : 10,
-            aspectRatio: isMobile ? 1.7777778 : 1.3333333,
-            qrbox: isMobile
-                ? { width: 250, height: 110 }
-                : { width: 300, height: 130 }
+            fps: 10,
+            qrbox: window.innerWidth <= 768
+                ? { width: 280, height: 110 }
+                : { width: 320, height: 120 },
+            aspectRatio: 1.0
         };
 
         if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
             config.formatsToSupport = [
-                Html5QrcodeSupportedFormats.CODE128,
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.QRCODE
+                Html5QrcodeSupportedFormats.DATAMATRIX,
+                Html5QrcodeSupportedFormats.QRCODE,
+                Html5QrcodeSupportedFormats.CODE128
             ];
         }
 
-        try {
-            await html5QrScanner.start(
-                { facingMode: { exact: "environment" } },
-                config,
-                onScanSuccess,
-                () => {}
-            );
-        } catch (e1) {
-            try {
-                await html5QrScanner.start(
-                    { facingMode: "environment" },
-                    config,
-                    onScanSuccess,
-                    () => {}
-                );
-            } catch (e2) {
-                const cameras = await Html5Qrcode.getCameras();
-                if (!cameras || !cameras.length) {
-                    throw new Error("No camera found");
-                }
+        await html5QrScanner.start(
+            preferredCamera.id,
+            config,
+            (decodedText) => {
+                const cleanDecoded = String(decodedText || "").trim();
+                const nowTs = Date.now();
 
-                const preferredCamera = cameras.find(cam =>
-                    /back|rear|environment/i.test(cam.label || '')
-                ) || cameras[0];
+                if (!cleanDecoded) return;
+                if (cleanDecoded === lastScannedValue && nowTs - lastScannedAt < 1200) return;
 
-                await html5QrScanner.start(
-                    preferredCamera.id,
-                    config,
-                    onScanSuccess,
-                    () => {}
-                );
-            }
-        }
+                lastScannedValue = cleanDecoded;
+                lastScannedAt = nowTs;
+                processScannedCode(cleanDecoded);
+            },
+            () => {}
+        );
 
         setTimeout(() => {
             const video = document.querySelector("#reader video");
@@ -46974,7 +46934,7 @@ async function openBarcodeScanner() {
                 video.muted = true;
                 video.style.width = "100%";
                 video.style.height = "100%";
-                video.style.objectFit = "contain";
+                video.style.objectFit = "cover";
                 video.style.background = "#000";
                 video.play().catch(() => {});
             }
@@ -46982,7 +46942,7 @@ async function openBarcodeScanner() {
 
         setLatestScannerMessage(`
             <div style="color:#22c55e;font-weight:bold;font-size:13px;text-align:center;line-height:1.8;">
-                الكاميرا شغالة، وجّه الباركود داخل المستطيل الأوسط
+                الكاميرا شغالة، وجّه الباركود داخل المساحة الأفقية
             </div>
         `);
 
@@ -46996,8 +46956,7 @@ async function openBarcodeScanner() {
         `);
         await destroyScannerInstance();
     }
-}
-// =====================================================
+}// =====================================================
 // Process Code
 // =====================================================
 function processScannedCode(code) {
